@@ -1,8 +1,9 @@
 mod classifier;
 use classifier::Classifier;
 fn main() {
-    let classifier = Classifier::new();
-    let _ = classifier.parse_csv("src/data/Ling.csv", "body", "label");
+    let classifier = Classifier::new("1");
+    let corpus = classifier.parse_csv("src/data/Ling.csv", "body", "label");
+    let _ = classifier.train(corpus.unwrap());
 }
 
 fn train() {}

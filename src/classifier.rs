@@ -6,39 +6,80 @@ pub struct Corpus {
 }
 
 pub struct Classifier {
-    weights: HashMap<String, f32>,
+    positive_label: String,
+    positive_probability: f64,
+    weights: HashMap<String, f64>,
 }
 
 impl Classifier {
-    pub fn new() -> Self {
+    pub fn new(spam_label: &str) -> Self {
         Self {
+            positive_label: spam_label.to_string(),
+            positive_probability: 0.0,
             weights: HashMap::new(),
         }
     }
 
-    fn train(corpus: Corpus) {
-        // let mut spam_record_count = 0;
-        // let mut record_count = 0;
-        // let mut word_frequencies: HashMap<String, usize> = HashMap::new();
+    pub fn train(mut self, corpus: Corpus) -> Result<(), String> {
+        let mut positive_record_count = 0;
+        let mut record_count = 0;
+        let mut word_frequencies: HashMap<String, u32> = HashMap::new();
 
-        // for result in reader.records() {
-        //     let record = result.unwrap();
-        //     let label = &record[label_column_position];
-        //     if label == "1" {
-        //         spam_record_count += 1;
-        //         let content = &record[content_column_position];
-        //         let words = content.split_whitespace().into_iter().map(|w| {
-        //             word_frequencies
-        //                 .entry(w)
-        //                 .and_modify(|f| *f += 1)
-        //                 .or_insert(1)
-        //         });
-        //     }
+        if corpus.content.len() != corpus.labels.len() {
+            return Err(String::from(
+                "Number of labels in corpus does not match the amount of content",
+            ));
+        }
 
-        //     record_count += 1;
-        // }
+        for (_, (content, label)) in corpus.content.iter().zip(corpus.labels.iter()).enumerate() {
+            if *label == self.positive_label {
+                positive_record_count += 1;
+                for w in content.split_whitespace() {
+                    word_frequencies
+                        .entry(String::from(w))
+                        .and_modify(|f| *f += 1)
+                        .or_insert(2); // Insert 2 instead of 1 to implicitly add Laplace smoothing
+                }
+            }
+            record_count += 1;
+        }
 
-        // let spam_probability: f32 = spam_record_count as f32 / record_count as f32;
+        let positive_word_count: u32 = word_frequencies.values().sum();
+        let positive_probability = positive_record_count as f64 / record_count as f64;
+        self.positive_probability = positive_probability;
+
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
+
+        // Compute conditional/posterior probabilities
+        for (_, (word, frequency)) in word_frequencies.iter().enumerate() {
+            let posterior = *frequency as f64 / positive_word_count as f64;
+            if posterior < min {
+                min = posterior;
+            }
+
+            if posterior > max {
+                max = posterior;
+            }
+
+            self.weights.insert(
+                word.to_string(),
+                *frequency as f64 / positive_word_count as f64,
+            );
+        }
+
+        // Normalise
+        for word in word_frequencies.keys() {
+            self.weights
+                .entry(word.to_string())
+                .and_modify(|p| *p = (*p - min) / (max - min));
+        }
+
+        let mut s: Vec<(&String, &f64)> = self.weights.iter().collect();
+        s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+
+        println!("{:#?}", s);
+        Ok(())
     }
 
     pub fn parse_csv(
