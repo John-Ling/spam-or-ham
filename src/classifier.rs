@@ -1,4 +1,5 @@
-use std::{collections::HashMap, fs::read_to_string};
+use regex::Regex;
+use std::collections::HashMap;
 
 pub struct Corpus {
     content: Vec<String>,
@@ -31,10 +32,16 @@ impl Classifier {
             ));
         }
 
+        let re = Regex::new(r"\w+|[^\w\s]").unwrap();
         for (_, (content, label)) in corpus.content.iter().zip(corpus.labels.iter()).enumerate() {
             if *label == self.positive_label {
+                let tokens: Vec<&str> = re
+                    .find_iter(content)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<&str>>();
+
                 positive_record_count += 1;
-                for w in content.split_whitespace() {
+                for w in tokens {
                     word_frequencies
                         .entry(String::from(w))
                         .and_modify(|f| *f += 1)
