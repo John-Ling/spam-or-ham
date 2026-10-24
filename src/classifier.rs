@@ -1,5 +1,6 @@
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 pub struct Corpus {
     content: Vec<String>,
@@ -9,22 +10,34 @@ pub struct Corpus {
 pub struct Classifier {
     positive_label: String,
     positive_probability: f64,
-    weights: HashMap<String, f64>,
+    positive_likelihoods: HashMap<String, f64>,
+    negative_likelihoods: HashMap<String, f64>,
+    positive_unseen_likelihood: f64,
+    negative_unseen_likelihood: f64,
 }
 
+static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\w+|[^\w\s]").unwrap());
+
 impl Classifier {
-    pub fn new(spam_label: &str) -> Self {
+    pub fn new(positive_label: &str) -> Self {
         Self {
-            positive_label: spam_label.to_string(),
+            positive_label: positive_label.to_string(),
             positive_probability: 0.0,
-            weights: HashMap::new(),
+            positive_likelihoods: HashMap::new(),
+            negative_likelihoods: HashMap::new(),
+            positive_unseen_likelihood: 0.0,
+            negative_unseen_likelihood: 0.0,
         }
     }
 
-    pub fn train(mut self, corpus: Corpus) -> Result<(), String> {
+    pub fn train(&mut self, corpus: Corpus) -> Result<(), String> {
         let mut positive_record_count = 0;
+        let mut negative_record_count = 0;
         let mut record_count = 0;
-        let mut word_frequencies: HashMap<String, u32> = HashMap::new();
+        let mut unique_words: HashSet<&str> = HashSet::new();
+
+        let mut positive_word_frequencies: HashMap<String, u32> = HashMap::new();
+        let mut negative_word_frequencies: HashMap<String, u32> = HashMap::new();
 
         if corpus.content.len() != corpus.labels.len() {
             return Err(String::from(
@@ -32,60 +45,71 @@ impl Classifier {
             ));
         }
 
-        let re = Regex::new(r"\w+|[^\w\s]").unwrap();
         for (_, (content, label)) in corpus.content.iter().zip(corpus.labels.iter()).enumerate() {
-            if *label == self.positive_label {
-                let tokens: Vec<&str> = re
-                    .find_iter(content)
-                    .map(|s| s.as_str())
-                    .collect::<Vec<&str>>();
+            let tokens = Self::tokenise(content);
+            let unique_tokens: HashSet<&str> = tokens.iter().copied().collect();
+            unique_words.extend(unique_tokens);
+            let mut word_frequencies = &mut negative_word_frequencies;
+            let mut count = &mut negative_record_count;
 
-                positive_record_count += 1;
-                for w in tokens {
-                    word_frequencies
-                        .entry(String::from(w))
-                        .and_modify(|f| *f += 1)
-                        .or_insert(2); // Insert 2 instead of 1 to implicitly add Laplace smoothing
-                }
+            if *label == self.positive_label {
+                word_frequencies = &mut positive_word_frequencies;
+                count = &mut positive_record_count;
+            }
+
+            *count += 1;
+            for w in tokens {
+                let _ = *word_frequencies
+                    .entry(String::from(w))
+                    .and_modify(|f| *f += 1)
+                    .or_insert(1);
             }
             record_count += 1;
         }
 
-        let positive_word_count: u32 = word_frequencies.values().sum();
+        let word_count: u32 = unique_words.len() as u32;
+        let positive_word_count: u32 = positive_word_frequencies.values().sum();
+        let negative_word_count: u32 = negative_word_frequencies.values().sum();
         let positive_probability = positive_record_count as f64 / record_count as f64;
         self.positive_probability = positive_probability;
 
-        let mut min = f64::MAX;
-        let mut max = f64::MIN;
-
-        // Compute conditional/posterior probabilities
-        for (_, (word, frequency)) in word_frequencies.iter().enumerate() {
-            let posterior = *frequency as f64 / positive_word_count as f64;
-            if posterior < min {
-                min = posterior;
-            }
-
-            if posterior > max {
-                max = posterior;
-            }
-
-            self.weights.insert(
+        // Compute conditional/likelihood probabilities
+        let alpha = 1.0;
+        for word in unique_words {
+            // Get frequency of each word in the positive and negative samples
+            // then apply laplace smoothing
+            let frequency_positive = positive_word_frequencies.get(word).unwrap_or(&0);
+            let frequency_negative = negative_word_frequencies.get(word).unwrap_or(&0);
+            self.positive_likelihoods.insert(
                 word.to_string(),
-                *frequency as f64 / positive_word_count as f64,
+                (*frequency_positive as f64 + alpha)
+                    / (positive_word_count as f64 + alpha * word_count as f64),
+            );
+
+            self.negative_likelihoods.insert(
+                word.to_string(),
+                (*frequency_negative as f64 + alpha)
+                    / (negative_word_count as f64 + alpha * word_count as f64),
             );
         }
 
-        // Normalise
-        for word in word_frequencies.keys() {
-            self.weights
-                .entry(word.to_string())
-                .and_modify(|p| *p = (*p - min) / (max - min));
-        }
+        self.positive_unseen_likelihood =
+            alpha as f64 / (positive_word_count as f64 + alpha * word_count as f64);
+        self.negative_unseen_likelihood =
+            alpha as f64 / (positive_word_count as f64 + alpha * word_count as f64);
 
-        let mut s: Vec<(&String, &f64)> = self.weights.iter().collect();
+        let mut s: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
+        s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+        println!("POSITIVE");
+        println!("{:#?}", s);
+
+        println!("NEGATIVE");
+
+        s = self.negative_likelihoods.iter().collect();
         s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
 
         println!("{:#?}", s);
+
         Ok(())
     }
 
@@ -126,5 +150,60 @@ impl Classifier {
         Ok(corpus)
     }
 
-    fn predict(text: String) {}
+    pub fn predict(&self, text: &str) {
+        let tokens = Self::tokenise(text);
+        let length = tokens.len();
+        let mut positive_probability = self.positive_probability.ln();
+        let mut negative_probability = (1.0 - self.positive_probability).ln();
+
+        for token in tokens {
+            let likelihood_positive = self.positive_likelihoods.get(token);
+            let likelihood_negative = self.negative_likelihoods.get(token);
+
+            // Skip words that appear in neither class
+            if likelihood_negative.is_none() && likelihood_positive.is_none() {
+                continue;
+            }
+
+            positive_probability += likelihood_positive
+                .unwrap_or(&self.positive_unseen_likelihood)
+                .ln();
+
+            negative_probability += likelihood_negative
+                .unwrap_or(&self.negative_unseen_likelihood)
+                .ln();
+        }
+
+        println!(
+            "log_pos={positive_probability:.2} log_neg={negative_probability:.2} tokens={}",
+            length
+        );
+
+        // Normalisation using log-sum-exp
+        let max = if positive_probability > negative_probability {
+            positive_probability
+        } else {
+            negative_probability
+        };
+
+        // Use log-sum-exp to calculate log sum
+        let log_probability_sum =
+            max + ((positive_probability - max).exp() + (negative_probability - max).exp()).ln();
+
+        let positive_probability_normalised = (positive_probability - log_probability_sum).exp();
+        let negative_probability_normalised = (negative_probability - log_probability_sum).exp();
+
+        println!(
+            "Positive {}  negative {} ",
+            positive_probability_normalised, negative_probability_normalised
+        );
+    }
+
+    fn tokenise(text: &str) -> Vec<&str> {
+        let tokens: Vec<&str> = TOKEN_REGEX
+            .find_iter(text)
+            .map(|s| s.as_str())
+            .collect::<Vec<&str>>();
+        return tokens;
+    }
 }
