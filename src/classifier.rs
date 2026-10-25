@@ -1,6 +1,8 @@
+use csv::Reader;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::LazyLock;
@@ -34,7 +36,26 @@ impl Classifier {
         }
     }
 
-    pub fn load_model(&mut self, model_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_model(&mut self, model_path: &str) -> Result<(), Box<dyn Error>> {
+        let serialised = Classifier {
+            positive_label: self.positive_label.to_string(),
+            positive_probability: self.positive_probability,
+            positive_likelihoods: self.positive_likelihoods.clone(),
+            negative_likelihoods: self.negative_likelihoods.clone(),
+            positive_unseen_likelihood: self.positive_unseen_likelihood,
+            negative_unseen_likelihood: self.negative_unseen_likelihood,
+        };
+
+        let write_file = File::create(model_path)?;
+        let writer = BufWriter::new(write_file);
+        match serde_json::to_writer(writer, &serialised) {
+            Ok(_) => println!("Saved model"),
+            Err(_) => println!("Failed to save model"),
+        }
+        Ok(())
+    }
+
+    pub fn load_model(&mut self, model_path: &str) -> Result<(), Box<dyn Error>> {
         let read_file = File::open(model_path)?;
         let reader = BufReader::new(read_file);
         let model: Classifier = serde_json::from_reader(reader)?;
@@ -47,11 +68,7 @@ impl Classifier {
         Ok(())
     }
 
-    pub fn train(
-        &mut self,
-        corpus: Corpus,
-        positive_label: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn train(&mut self, corpus: Corpus, positive_label: &str) -> Result<(), Box<dyn Error>> {
         let mut positive_record_count = 0;
         let mut negative_record_count = 0;
         let mut record_count = 0;
@@ -119,35 +136,6 @@ impl Classifier {
         self.negative_unseen_likelihood =
             alpha as f64 / (positive_word_count as f64 + alpha * word_count as f64);
 
-        println!("Trained model");
-        let serialised = Classifier {
-            positive_label: positive_label.to_string(),
-            positive_probability,
-            positive_likelihoods: self.positive_likelihoods.clone(),
-            negative_likelihoods: self.negative_likelihoods.clone(),
-            positive_unseen_likelihood: self.positive_unseen_likelihood,
-            negative_unseen_likelihood: self.negative_unseen_likelihood,
-        };
-
-        let write_file = File::create("./model.json")?;
-        let writer = BufWriter::new(write_file);
-        match serde_json::to_writer(writer, &serialised) {
-            Ok(_) => println!("Saved model"),
-            Err(_) => println!("Failed to save model"),
-        }
-
-        // let mut s: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
-        // s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-        // println!("POSITIVE");
-        // println!("{:#?}", s);
-
-        // println!("NEGATIVE");
-
-        // s = self.negative_likelihoods.iter().collect();
-        // s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-
-        // println!("{:#?}", s);
-
         Ok(())
     }
 
@@ -156,16 +144,15 @@ impl Classifier {
         path: &str,
         content_column: &str,
         label_column: &str,
-    ) -> Result<Corpus, String> {
-        let data = std::fs::read_to_string(path).expect("could not read data from file");
-        let mut reader = csv::Reader::from_reader(data.as_bytes());
+    ) -> Result<Corpus, Box<dyn Error>> {
+        let mut reader = Reader::from_path(path)?;
         let headers = reader
             .headers()
             .expect("Failed to read headers of CSV file");
 
         let column_present = |s: &str| headers.iter().any(|c| c == s);
         if !column_present(content_column) || !column_present(label_column) {
-            return Err(String::from("Columns are missing from CSV file"));
+            return Err(Box::from("Columns are missing from CSV file"));
         }
 
         let find_column_position = |s: &str| headers.iter().position(|c| c == s);
@@ -188,9 +175,8 @@ impl Classifier {
         Ok(corpus)
     }
 
-    pub fn predict(&self, text: &str) {
+    pub fn predict(&self, text: &str) -> bool {
         let tokens = Self::tokenise(text);
-        let length = tokens.len();
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
 
@@ -212,11 +198,6 @@ impl Classifier {
                 .ln();
         }
 
-        println!(
-            "log_pos={positive_probability:.2} log_neg={negative_probability:.2} tokens={}",
-            length
-        );
-
         // Normalisation using log-sum-exp
         let max = if positive_probability > negative_probability {
             positive_probability
@@ -224,17 +205,19 @@ impl Classifier {
             negative_probability
         };
 
-        // Use log-sum-exp to calculate log sum
+        // Use log-sum-exp to calculate sum of the logarithms of our posteriors
         let log_probability_sum =
             max + ((positive_probability - max).exp() + (negative_probability - max).exp()).ln();
 
         let positive_probability_normalised = (positive_probability - log_probability_sum).exp();
         let negative_probability_normalised = (negative_probability - log_probability_sum).exp();
 
-        println!(
-            "Positive {}  negative {} ",
-            positive_probability_normalised, negative_probability_normalised
-        );
+        // println!(
+        //     "Positive {}  negative {} ",
+        //     positive_probability_normalised, negative_probability_normalised
+        // );
+
+        positive_probability_normalised > negative_probability_normalised
     }
 
     fn tokenise(text: &str) -> Vec<&str> {
