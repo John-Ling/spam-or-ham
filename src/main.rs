@@ -1,9 +1,10 @@
 mod classifier;
 use classifier::Classifier;
 fn main() {
-    let mut classifier = Classifier::new("1");
-    let corpus = classifier.parse_csv("src/data/ling_cleaned.csv", "body", "label");
-    let _ = classifier.train(corpus.unwrap());
+    let mut classifier = Classifier::new();
+    let _ = classifier.load_model("./model.json");
+    // let corpus = classifier.parse_csv("src/data/ling_cleaned.csv", "body", "label");
+    // let _ = classifier.train(corpus.unwrap(), "1");
 
     let _ = classifier.predict("
     
@@ -21,7 +22,7 @@ the georgetown arabic department of the school of languages and linguistics will
         "
    Hello folks
 I'm new to Linux, so here goes...
-to the outside through my .
+to the outside through my modem.
     ",
     );
 
@@ -71,7 +72,7 @@ http://www.lotsonet.com/opportunity/remove.html
     );
 
     let _ = classifier.predict("
-        A man endowed with a 7-8'' hammer is simply  better equipped than a man with a 5-6'' hammer.  Would you rather havemore than enough to get the job done or fall = short. It's totally upto you. Our Methods are guaranteed to increase y= our size by 1-3'' Come in here and see how 
+        A man endowed with a 7-8'' hammer is simply  better equipped! than a man with a 5-6'' hammer.  Would you rather havemore than enough to get the job done or fall = short. It's totally upto you. Our Methods are guaranteed to increase y= our size by 1-3'' Come in here and see how 
     ");
 
     let _ = classifier.predict("

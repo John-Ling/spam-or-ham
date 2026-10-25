@@ -1,5 +1,8 @@
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::sync::LazyLock;
 
 pub struct Corpus {
@@ -7,6 +10,7 @@ pub struct Corpus {
     labels: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
     positive_label: String,
     positive_probability: f64,
@@ -19,9 +23,9 @@ pub struct Classifier {
 static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\w+|[^\w\s]").unwrap());
 
 impl Classifier {
-    pub fn new(positive_label: &str) -> Self {
+    pub fn new() -> Self {
         Self {
-            positive_label: positive_label.to_string(),
+            positive_label: String::from(""),
             positive_probability: 0.0,
             positive_likelihoods: HashMap::new(),
             negative_likelihoods: HashMap::new(),
@@ -30,7 +34,24 @@ impl Classifier {
         }
     }
 
-    pub fn train(&mut self, corpus: Corpus) -> Result<(), String> {
+    pub fn load_model(&mut self, model_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let read_file = File::open(model_path)?;
+        let reader = BufReader::new(read_file);
+        let model: Classifier = serde_json::from_reader(reader)?;
+        self.positive_label = model.positive_label;
+        self.positive_probability = model.positive_probability;
+        self.positive_likelihoods = model.positive_likelihoods;
+        self.positive_unseen_likelihood = model.positive_unseen_likelihood;
+        self.negative_likelihoods = model.negative_likelihoods;
+        self.negative_unseen_likelihood = model.negative_unseen_likelihood;
+        Ok(())
+    }
+
+    pub fn train(
+        &mut self,
+        corpus: Corpus,
+        positive_label: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut positive_record_count = 0;
         let mut negative_record_count = 0;
         let mut record_count = 0;
@@ -40,7 +61,7 @@ impl Classifier {
         let mut negative_word_frequencies: HashMap<String, u32> = HashMap::new();
 
         if corpus.content.len() != corpus.labels.len() {
-            return Err(String::from(
+            return Err(Box::from(
                 "Number of labels in corpus does not match the amount of content",
             ));
         }
@@ -52,7 +73,7 @@ impl Classifier {
             let mut word_frequencies = &mut negative_word_frequencies;
             let mut count = &mut negative_record_count;
 
-            if *label == self.positive_label {
+            if *label == positive_label {
                 word_frequencies = &mut positive_word_frequencies;
                 count = &mut positive_record_count;
             }
@@ -74,7 +95,7 @@ impl Classifier {
         self.positive_probability = positive_probability;
 
         // Compute conditional/likelihood probabilities
-        let alpha = 1.0;
+        let alpha = 3.0;
         for word in unique_words {
             // Get frequency of each word in the positive and negative samples
             // then apply laplace smoothing
@@ -98,17 +119,34 @@ impl Classifier {
         self.negative_unseen_likelihood =
             alpha as f64 / (positive_word_count as f64 + alpha * word_count as f64);
 
-        let mut s: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
-        s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-        println!("POSITIVE");
-        println!("{:#?}", s);
+        println!("Trained model");
+        let serialised = Classifier {
+            positive_label: positive_label.to_string(),
+            positive_probability,
+            positive_likelihoods: self.positive_likelihoods.clone(),
+            negative_likelihoods: self.negative_likelihoods.clone(),
+            positive_unseen_likelihood: self.positive_unseen_likelihood,
+            negative_unseen_likelihood: self.negative_unseen_likelihood,
+        };
 
-        println!("NEGATIVE");
+        let write_file = File::create("./model.json")?;
+        let writer = BufWriter::new(write_file);
+        match serde_json::to_writer(writer, &serialised) {
+            Ok(_) => println!("Saved model"),
+            Err(_) => println!("Failed to save model"),
+        }
 
-        s = self.negative_likelihoods.iter().collect();
-        s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+        // let mut s: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
+        // s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+        // println!("POSITIVE");
+        // println!("{:#?}", s);
 
-        println!("{:#?}", s);
+        // println!("NEGATIVE");
+
+        // s = self.negative_likelihoods.iter().collect();
+        // s.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+
+        // println!("{:#?}", s);
 
         Ok(())
     }
