@@ -9,7 +9,105 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let content_column = "body";
     let label_column = "label";
     let positive_label = "1";
-    let k = 10;
+    let k: usize = 10;
+
+    let mut classifier = Classifier::new();
+    // let corpus = classifier.parse_csv("src/data/ling_cleaned.csv", content_column, label_column)?;
+    // println!("Training model");
+    // let _ = classifier.train(corpus, positive_label)?;
+    // println!("Training completed");
+    // let _ = classifier.save_model("model.json")?;
+
+    println!("Loading pretrained model");
+    let _ = classifier.load_model("./model.json")?;
+
+    let mut false_positive_count = 0.0;
+    let mut false_negative_count = 0.0;
+    let mut true_positive_count = 0.0;
+
+    let mut reader = Reader::from_path("src/data/assassin_cleaned.csv")?;
+    let headers = reader.headers()?;
+    let find_column_position = |s: &str| headers.iter().position(|c| c == s);
+    let content_column_position = find_column_position(content_column).unwrap();
+    let label_column_position = find_column_position(label_column).unwrap();
+    println!("Calculating metrics");
+    for result in reader.records() {
+        let record = result?;
+        let content = &record[content_column_position];
+        let is_positive = classifier.predict(content);
+        let actual = if &record[label_column_position] == positive_label {
+            true
+        } else {
+            false
+        };
+
+        if is_positive && actual {
+            true_positive_count += 1.0;
+        } else if is_positive && !actual {
+            false_positive_count += 1.0;
+        } else if !is_positive && actual {
+            false_negative_count += 1.0;
+        }
+    }
+
+    let precision = true_positive_count / (true_positive_count + false_positive_count);
+    let recall = true_positive_count / (true_positive_count + false_negative_count);
+    let f1 = 2.0 * precision * recall / (precision + recall);
+    println!("PRECISION: {}\nRECALL: {}\nF1: {}", precision, recall, f1);
+
+    println!(
+        "{}",
+        classifier.predict(
+            "Good morning John
+
+Could you please reply to this email with your personal cell phone number. 
+
+Kind Regards,
+Eric Zhang"
+        )
+    );
+    Ok(())
+}
+
+fn split_csv(k: usize) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let mut reader = Reader::from_path("src/data/ling_cleaned.csv")?;
+    let headers = reader.headers()?.clone();
+    let records: Vec<csv::StringRecord> = reader.records().collect::<Result<_, _>>()?;
+    let n = records.len();
+    let base = n / k;
+    let extra = n % k;
+
+    let mut paths = Vec::with_capacity(k);
+    let mut start = 0;
+
+    // Split csv into K parts and save to temporary files
+    for i in 0..k {
+        let len = base + if i < extra { 1 } else { 0 };
+        let chunk = &records[start..start + len];
+        start += len;
+
+        // keep() stops the file being deleted when the handle is dropped
+        let (file, path) = NamedTempFile::new()?.keep()?;
+        drop(file);
+
+        let mut writer = csv::WriterBuilder::new().from_path(&path)?;
+        writer.write_record(&headers)?;
+        for rec in chunk {
+            writer.write_record(rec)?;
+        }
+        writer.flush()?;
+
+        paths.push(path);
+    }
+    Ok(paths)
+}
+
+fn cross_validation(
+    k: usize,
+    content_column: &str,
+    label_column: &str,
+    positive_label: &str,
+) -> Result<(), Box<dyn Error>> {
     let paths = split_csv(k).unwrap();
 
     let mut average_f1 = 0.0;
@@ -29,11 +127,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         merge_csv_chunks(&paths, i, train_path.to_str().unwrap())?;
 
         let mut fold_classifier = Classifier::new();
-        let corpus = fold_classifier.parse_csv(
-            train_path.to_str().unwrap(),
-            content_column,
-            label_column,
-        );
+        let corpus =
+            fold_classifier.parse_csv(train_path.to_str().unwrap(), content_column, label_column);
         let _ = fold_classifier.train(corpus.unwrap(), "1");
 
         let mut false_positive_count: f64 = 0.0;
@@ -88,40 +183,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn split_csv(k: usize) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let mut reader = Reader::from_path("src/data/ling_cleaned.csv")?;
-    let headers = reader.headers()?.clone();
-    let records: Vec<csv::StringRecord> = reader.records().collect::<Result<_, _>>()?;
-    let n = records.len();
-    let base = n / k;
-    let extra = n % k;
-
-    let mut paths = Vec::with_capacity(k);
-    let mut start = 0;
-
-    // Split csv into K parts and save to temporary files
-    for i in 0..k {
-        let len = base + if i < extra { 1 } else { 0 };
-        let chunk = &records[start..start + len];
-        start += len;
-
-        // keep() stops the file being deleted when the handle is dropped
-        let (file, path) = NamedTempFile::new()?.keep()?;
-        drop(file);
-
-        let mut writer = csv::WriterBuilder::new().from_path(&path)?;
-        writer.write_record(&headers)?;
-        for rec in chunk {
-            writer.write_record(rec)?;
-        }
-        writer.flush()?;
-
-        paths.push(path);
-    }
-    Ok(paths)
-}
-
-fn merge_csv_chunks(paths: &[PathBuf], exclude: usize, out_path: &str) -> Result<(), Box<dyn Error>> {
+fn merge_csv_chunks(
+    paths: &[PathBuf],
+    exclude: usize,
+    out_path: &str,
+) -> Result<(), Box<dyn Error>> {
     let mut writer = csv::WriterBuilder::new().from_path(out_path)?;
     let mut header_written = false;
 

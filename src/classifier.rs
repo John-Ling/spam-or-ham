@@ -112,7 +112,7 @@ impl Classifier {
         self.positive_probability = positive_probability;
 
         // Compute conditional/likelihood probabilities
-        let alpha = 3.0;
+        let alpha = 1.0;
         for word in unique_words {
             // Get frequency of each word in the positive and negative samples
             // then apply laplace smoothing
