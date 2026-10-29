@@ -55,10 +55,24 @@ impl Classifier {
         Ok(())
     }
 
-    pub fn load_model(&mut self, model_path: &str) -> Result<(), Box<dyn Error>> {
+    pub fn load_pretrained(&mut self, model_path: &str) -> Result<(), Box<dyn Error>> {
         let read_file = File::open(model_path)?;
         let reader = BufReader::new(read_file);
         let model: Classifier = serde_json::from_reader(reader)?;
+        self.positive_label = model.positive_label;
+        self.positive_probability = model.positive_probability;
+        self.positive_likelihoods = model.positive_likelihoods;
+        self.positive_unseen_likelihood = model.positive_unseen_likelihood;
+        self.negative_likelihoods = model.negative_likelihoods;
+        self.negative_unseen_likelihood = model.negative_unseen_likelihood;
+        Ok(())
+    }
+
+    pub fn load_pretrained_from_string(
+        &mut self,
+        model_string: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let model = serde_json::from_str::<Classifier>(model_string)?;
         self.positive_label = model.positive_label;
         self.positive_probability = model.positive_probability;
         self.positive_likelihoods = model.positive_likelihoods;
