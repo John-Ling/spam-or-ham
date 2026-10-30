@@ -16,7 +16,7 @@
   <script type="module">
     import init, { greet, load_classifier } from "./public/pkg/spam_or_ham.js";
     init().then(async () => {
-      let res = await fetch("http://127.0.0.1:5500/web/public/model.json");
+      let res = await fetch("/model.json");
       let model_as_text = await res.text();
       console.log("model", model_as_text)
       let text = load_classifier(model_as_text);
