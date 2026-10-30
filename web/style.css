@@ -1,8 +1,49 @@
-.app {
+@font-face {
+    font-family: "RetroBlendy";
+    src: url("public/retro_blendy.otf") format("opentype");
+    font-weight: normal;
+    font-style: norma;
+    font-display: swap;
+}
+
+:root {
+    --background: #f54eca;
+    --card: #d340ad;
+    --foreground: #ead22f;
+}
+
+#app {
     display: flex;
     min-height: 100vh;
     min-width: 100vw;
-    justify-content: center;
     align-items: center;
     flex-direction: column;
+    background-color: var(--background);
+    color: var(--foreground);
+}
+
+#app-container {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    width: 60vw;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+h1 {
+    font-size: 6rem;
+    font-family: "RetroBlendy"
+}
+
+#input-field {
+    background-color: var(--card);
+    border: var(--foreground);
+    resize: none;
+    width: 40%;
+    height: 33rem;
+}
+
+#input-field:active {
+    border: none;
 }
