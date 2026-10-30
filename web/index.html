@@ -9,20 +9,10 @@
 </head>
 
 <body class="app">
-
   <h1>Hello</h1>
+  <input type="text" id="input-field" />
   <div id="name"></div>
-
-  <script type="module">
-    import init, { greet, load_classifier } from "./public/pkg/spam_or_ham.js";
-    init().then(async () => {
-      let res = await fetch("/model.json");
-      let model_as_text = await res.text();
-      console.log("model", model_as_text)
-      let text = load_classifier(model_as_text);
-      document.getElementById("name").innerText = text;
-    })
-  </script>
+  <script type="module" src="script.ts"></script>
 </body>
 
 </html>

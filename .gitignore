@@ -1,3 +1,4 @@
 /target
 /src/data
 *.json
+/web/node_modules
