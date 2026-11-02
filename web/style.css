@@ -1,14 +1,22 @@
 @font-face {
-    font-family: "RetroBlendy";
-    src: url("public/retro_blendy.otf") format("opentype");
+    font-family: "Lalezar";
+    src: url("public/Lalezar-Regular.ttf") format("truetype");
     font-weight: normal;
-    font-style: norma;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Inter";
+    src: url("public/Inter_18pt-Bold.ttf") format("truetype");
+    font-weight: bold;
+    font-style: normal;
     font-display: swap;
 }
 
 :root {
-    --background: #f54eca;
-    --card: #d340ad;
+    --background: #F51DC6;
+    --card: #E122B6;
     --foreground: #ead22f;
 }
 
@@ -20,6 +28,10 @@
     flex-direction: column;
     background-color: var(--background);
     color: var(--foreground);
+
+    background-image: radial-gradient(#da2eb2 2px, transparent 1px);
+    background-size: 30px 30px;
+
 }
 
 #app-container {
@@ -31,19 +43,56 @@
     margin-right: auto;
 }
 
-h1 {
-    font-size: 6rem;
-    font-family: "RetroBlendy"
+#header {
+    font-size: clamp(3rem, 1rem + 5vw, 6rem);
+    font-family: "Lalezar";
+    display: flex;
+    gap: 1rem;
 }
+
+#ham-header {
+    transition: translate 0.2s cubic-bezier(0.24, 1.19, 0.8, 0.96);
+
+}
+
+#spam-header {
+    transition: translate 0.2s cubic-bezier(0.24, 1.19, 0.8, 0.96);
+
+}
+
+.lift {
+    translate: 0 -70px;
+}
+
+.sink {
+    translate: 0 70px;
+}
+
 
 #input-field {
     background-color: var(--card);
+    color: var(--foreground);
     border: var(--foreground);
+    font-family: "Inter";
     resize: none;
-    width: 40%;
+    /* width: 40%; */
+    width: clamp(10rem, 80vw, 30rem);
     height: 33rem;
+    padding: 0.25rem;
 }
 
-#input-field:active {
-    border: none;
+#input-field:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+
+@media (width <=768px) {
+    .lift {
+        translate: 0 -35px;
+    }
+
+    .sink {
+        translate: 0 35px;
+    }
 }

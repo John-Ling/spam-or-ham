@@ -11,9 +11,13 @@ init().then(async () => {
   document.getElementById("name")!.innerText = text
 })
 
+let spamHeader = document.getElementById("spam-header")!;
+let hamHeader = document.getElementById("ham-header")!;
+
 document.getElementById("input-field")?.addEventListener("input", (e) => {
   let inputContent = (e.target as HTMLInputElement).value
   console.log("Entered ", inputContent)
-  console.log(predict(inputContent))
+  let isSpam = predict(inputContent)
+  spamHeader.classList = isSpam ? "lift" : "sink"
+  hamHeader.classList = isSpam ? "sink" : "lift"
 })
-
