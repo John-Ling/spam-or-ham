@@ -19,13 +19,6 @@ pub fn load_classifier(model_json_string: &str) -> bool {
 #[wasm_bindgen]
 pub fn predict(string: &str) -> bool {
     web_sys::console::log_2(&"{}".into(), &JsValue::from_str(string));
-
-    let classifier_loaded = CLASSIFIER_INSTANCE.get().is_none();
-
-    web_sys::console::log_2(
-        &"Classifier is {}".into(),
-        &JsValue::from_bool(classifier_loaded),
-    );
     let classifier = CLASSIFIER_INSTANCE.get().unwrap();
     return classifier.predict(string);
 }

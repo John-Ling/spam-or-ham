@@ -16,38 +16,55 @@
 
 :root {
     --background: #F51DC6;
+    --border: #ad278c;
+    --shadow: #c727a0;
     --card: #E122B6;
     --foreground: #ead22f;
 }
 
 #app {
     display: flex;
-    min-height: 100vh;
-    min-width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
     align-items: center;
+    justify-content: center;
     flex-direction: column;
+    /* background-color: color-mix(in srgb, var(--background), black 2%); */
     background-color: var(--background);
     color: var(--foreground);
 
-    background-image: radial-gradient(#da2eb2 2px, transparent 1px);
-    background-size: 30px 30px;
-
+    background-image:
+        radial-gradient(circle, #da2eb2 4px, transparent 1px),
+        radial-gradient(circle, #da2eb2 4px, transparent 1px);
+    background-size: 90px 90px;
+    background-position: 0 0, 45px 45px;
+    background-repeat: repeat;
 }
 
 #app-container {
+    background: var(--background);
+    border: solid 0.125rem var(--border);
+    box-shadow: 7px 7px 0 0 var(--shadow);
+    backdrop-filter: blur(8px);
+    /* filter: drop-shadow(0 5px 6px rgb(0 0 0 / 0.15)); */
     display: flex;
     align-items: center;
     flex-direction: column;
-    width: 60vw;
+    width: 40vw;
     margin-left: auto;
     margin-right: auto;
+    padding-bottom: 2rem;
 }
 
 #header {
-    font-size: clamp(3rem, 1rem + 5vw, 6rem);
+    font-size: clamp(4rem, 1rem + 5vw, 6rem);
     font-family: "Lalezar";
     display: flex;
+    align-items: center;
     gap: 1rem;
+    margin: 0;
+    height: clamp(3rem, 24vh, 20rem);
 }
 
 #ham-header {
@@ -76,8 +93,8 @@
     font-family: "Inter";
     resize: none;
     /* width: 40%; */
-    width: clamp(10rem, 80vw, 30rem);
-    height: 33rem;
+    width: clamp(14rem, 80vw, 30rem);
+    height: 31rem;
     padding: 0.25rem;
 }
 
