@@ -10,67 +10,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let label_column = "label";
     let positive_label = "1";
     let k: usize = 10;
-
-    let mut classifier = Classifier::new();
-    // let corpus = classifier.parse_csv("src/data/ling_cleaned.csv", content_column, label_column)?;
+    let _ = cross_validation(k, content_column, label_column, positive_label);
+    // let mut classifier = Classifier::new();
+    // let corpus = classifier.parse_csv(
+    //     "src/data/assassin_cleaned_alt.csv",
+    //     content_column,
+    //     label_column,
+    // )?;
     // println!("Training model");
     // let _ = classifier.train(corpus, positive_label)?;
     // println!("Training completed");
     // let _ = classifier.save_model("model.json")?;
+    // println!("Loading pretrained model");
+    // let _ = classifier.load_pretrained("model.json")?;
+    // println!("Running cross validation");
 
-    println!("Loading pretrained model");
-    let _ = classifier.load_pretrained("src/model.json")?;
+    //     let mut false_positive_count = 0.0;
+    //     let mut false_negative_count = 0.0;
+    //     let mut true_positive_count = 0.0;
 
-    // let mut false_positive_count = 0.0;
-    // let mut false_negative_count = 0.0;
-    // let mut true_positive_count = 0.0;
+    //     let mut reader = Reader::from_path("src/data/assassin_cleaned.csv")?;
+    //     let headers = reader.headers()?;
+    //     let find_column_position = |s: &str| headers.iter().position(|c| c == s);
+    //     let content_column_position = find_column_position(content_column).unwrap();
+    //     let label_column_position = find_column_position(label_column).unwrap();
+    //     println!("Calculating metrics");
+    //     for result in reader.records() {
+    //         let record = result?;
+    //         let content = &record[content_column_position];
+    //         let is_positive = classifier.predict(content);
+    //         let actual = if &record[label_column_position] == positive_label {
+    //             true
+    //         } else {
+    //             false
+    //         };
 
-    // let mut reader = Reader::from_path("src/data/assassin_cleaned.csv")?;
-    // let headers = reader.headers()?;
-    // let find_column_position = |s: &str| headers.iter().position(|c| c == s);
-    // let content_column_position = find_column_position(content_column).unwrap();
-    // let label_column_position = find_column_position(label_column).unwrap();
-    // println!("Calculating metrics");
-    // for result in reader.records() {
-    //     let record = result?;
-    //     let content = &record[content_column_position];
-    //     let is_positive = classifier.predict(content);
-    //     let actual = if &record[label_column_position] == positive_label {
-    //         true
-    //     } else {
-    //         false
-    //     };
-
-    //     if is_positive && actual {
-    //         true_positive_count += 1.0;
-    //     } else if is_positive && !actual {
-    //         false_positive_count += 1.0;
-    //     } else if !is_positive && actual {
-    //         false_negative_count += 1.0;
+    //         if is_positive && actual {
+    //             true_positive_count += 1.0;
+    //         } else if is_positive && !actual {
+    //             false_positive_count += 1.0;
+    //         } else if !is_positive && actual {
+    //             false_negative_count += 1.0;
+    //         }
     //     }
-    // }
 
-    // let precision = true_positive_count / (true_positive_count + false_positive_count);
-    // let recall = true_positive_count / (true_positive_count + false_negative_count);
-    // let f1 = 2.0 * precision * recall / (precision + recall);
-    // println!("PRECISION: {}\nRECALL: {}\nF1: {}", precision, recall, f1);
+    //     let precision = true_positive_count / (true_positive_count + false_positive_count);
+    //     let recall = true_positive_count / (true_positive_count + false_negative_count);
+    //     let f1 = 2.0 * precision * recall / (precision + recall);
+    //     println!("PRECISION: {}\nRECALL: {}\nF1: {}", precision, recall, f1);
 
-    println!(
-        "{}",
-        classifier.predict(
-            "Good morning John
-
-Could you please reply to this email with your personal cell phone number. 
-
-Kind Regards,
-Eric Zhang"
-        )
-    );
     Ok(())
 }
 
 fn split_csv(k: usize) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let mut reader = Reader::from_path("src/data/ling_cleaned.csv")?;
+    let mut reader = Reader::from_path("src/data/Ling.csv")?;
     let headers = reader.headers()?.clone();
     let records: Vec<csv::StringRecord> = reader.records().collect::<Result<_, _>>()?;
     let n = records.len();
@@ -166,7 +159,10 @@ fn cross_validation(
         let f1 = 2.0 * precision * recall / (precision + recall);
 
         println!("TEST RUN {} RESULTS", i);
-        println!("PRECISION: {}\nRECALL: {}\nF1: {}", precision, recall, f1);
+        println!(
+            "PRECISION: {}\nRECALL:    {}\nF1:        {}",
+            precision, recall, f1
+        );
         average_precision += precision;
         average_recall += recall;
         average_f1 += f1;
@@ -177,7 +173,7 @@ fn cross_validation(
     average_f1 /= k as f64;
     println!("FINAL RESULTS");
     println!(
-        "PRECISION: {}\nRECALL: {}\nF1: {}",
+        "PRECISION: {}\nRECALL:    {}\nF1:        {}",
         average_precision, average_recall, average_f1
     );
     Ok(())

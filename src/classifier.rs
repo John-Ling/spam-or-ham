@@ -1,4 +1,5 @@
 use csv::Reader;
+use polars::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -14,6 +15,7 @@ pub struct Corpus {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
+    alpha: f64,
     positive_label: String,
     positive_probability: f64,
     positive_likelihoods: HashMap<String, f64>,
@@ -27,6 +29,7 @@ static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\w+|[^\w\s]"
 impl Classifier {
     pub fn new() -> Self {
         Self {
+            alpha: 1.0,
             positive_label: String::from(""),
             positive_probability: 0.0,
             positive_likelihoods: HashMap::new(),
@@ -38,6 +41,7 @@ impl Classifier {
 
     pub fn save_model(&mut self, model_path: &str) -> Result<(), Box<dyn Error>> {
         let serialised = Classifier {
+            alpha: self.alpha,
             positive_label: self.positive_label.to_string(),
             positive_probability: self.positive_probability,
             positive_likelihoods: self.positive_likelihoods.clone(),
@@ -59,6 +63,7 @@ impl Classifier {
         let read_file = File::open(model_path)?;
         let reader = BufReader::new(read_file);
         let model: Classifier = serde_json::from_reader(reader)?;
+        self.alpha = model.alpha;
         self.positive_label = model.positive_label;
         self.positive_probability = model.positive_probability;
         self.positive_likelihoods = model.positive_likelihoods;
@@ -73,6 +78,7 @@ impl Classifier {
         model_string: &str,
     ) -> Result<(), Box<dyn Error>> {
         let model = serde_json::from_str::<Classifier>(model_string)?;
+        self.alpha = model.alpha;
         self.positive_label = model.positive_label;
         self.positive_probability = model.positive_probability;
         self.positive_likelihoods = model.positive_likelihoods;
@@ -126,7 +132,6 @@ impl Classifier {
         self.positive_probability = positive_probability;
 
         // Compute conditional/likelihood probabilities
-        let alpha = 1.0;
         for word in unique_words {
             // Get frequency of each word in the positive and negative samples
             // then apply laplace smoothing
@@ -134,21 +139,21 @@ impl Classifier {
             let frequency_negative = negative_word_frequencies.get(word).unwrap_or(&0);
             self.positive_likelihoods.insert(
                 word.to_string(),
-                (*frequency_positive as f64 + alpha)
-                    / (positive_word_count as f64 + alpha * word_count as f64),
+                (*frequency_positive as f64 + self.alpha)
+                    / (positive_word_count as f64 + self.alpha * word_count as f64),
             );
 
             self.negative_likelihoods.insert(
                 word.to_string(),
-                (*frequency_negative as f64 + alpha)
-                    / (negative_word_count as f64 + alpha * word_count as f64),
+                (*frequency_negative as f64 + self.alpha)
+                    / (negative_word_count as f64 + self.alpha * word_count as f64),
             );
         }
 
         self.positive_unseen_likelihood =
-            alpha as f64 / (positive_word_count as f64 + alpha * word_count as f64);
+            self.alpha as f64 / (positive_word_count as f64 + self.alpha * word_count as f64);
         self.negative_unseen_likelihood =
-            alpha as f64 / (positive_word_count as f64 + alpha * word_count as f64);
+            self.alpha as f64 / (positive_word_count as f64 + self.alpha * word_count as f64);
 
         Ok(())
     }
@@ -160,6 +165,14 @@ impl Classifier {
         label_column: &str,
     ) -> Result<Corpus, Box<dyn Error>> {
         let mut reader = Reader::from_path(path)?;
+        let mut df = CsvReadOptions::default()
+            .with_has_header(true)
+            .try_into_reader_with_file_path(Some(path.into()))?
+            .finish()?;
+        df = df.drop_nulls(Some(&[content_column]))?;
+        df = df.lazy().with_column  
+
+
         let headers = reader
             .headers()
             .expect("Failed to read headers of CSV file");
@@ -225,12 +238,6 @@ impl Classifier {
 
         let positive_probability_normalised = (positive_probability - log_probability_sum).exp();
         let negative_probability_normalised = (negative_probability - log_probability_sum).exp();
-
-        // println!(
-        //     "Positive {}  negative {} ",
-        //     positive_probability_normalised, negative_probability_normalised
-        // );
-
         positive_probability_normalised > negative_probability_normalised
     }
 
@@ -240,5 +247,7 @@ impl Classifier {
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
         return tokens;
+        // let bigrams = tokens.windows(2).map(|w| (w[0], w[1])).collect();
+        // return bigrams;
     }
 }
