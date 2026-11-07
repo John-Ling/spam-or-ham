@@ -1,4 +1,3 @@
-use csv::Reader;
 use polars::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -6,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::ops::Index;
 use std::sync::LazyLock;
+use stop_words::{Language, get};
 
 pub struct Corpus {
     content: Vec<String>,
@@ -16,6 +17,9 @@ pub struct Corpus {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
     alpha: f64,
+    content_column: String,
+    label_column: String,
+    negative_label: String,
     positive_label: String,
     positive_probability: f64,
     positive_likelihoods: HashMap<String, f64>,
@@ -24,12 +28,31 @@ pub struct Classifier {
     negative_unseen_likelihood: f64,
 }
 
-static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\w+|[^\w\s]").unwrap());
+const TRAILING_PUNCTUATION_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\w+|[^\w\s]").unwrap());
+const EMAIL_REGEX: &str = r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
+const EMOTICON_REGEX: &str = r"[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)";
+
+static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    {
+        Regex::new(
+            format!(
+                r"({})|({})|([a-zA-Z0-9\s!?$%'])|.",
+                EMAIL_REGEX, EMOTICON_REGEX
+            )
+            .as_str(),
+        )
+    }
+    .unwrap()
+});
 
 impl Classifier {
     pub fn new() -> Self {
         Self {
             alpha: 1.0,
+            content_column: String::from(""),
+            label_column: String::from(""),
+            negative_label: String::from(""),
             positive_label: String::from(""),
             positive_probability: 0.0,
             positive_likelihoods: HashMap::new(),
@@ -42,6 +65,9 @@ impl Classifier {
     pub fn save_model(&mut self, model_path: &str) -> Result<(), Box<dyn Error>> {
         let serialised = Classifier {
             alpha: self.alpha,
+            content_column: self.content_column.to_string(),
+            label_column: self.label_column.to_string(),
+            negative_label: self.negative_label.to_string(),
             positive_label: self.positive_label.to_string(),
             positive_probability: self.positive_probability,
             positive_likelihoods: self.positive_likelihoods.clone(),
@@ -64,6 +90,9 @@ impl Classifier {
         let reader = BufReader::new(read_file);
         let model: Classifier = serde_json::from_reader(reader)?;
         self.alpha = model.alpha;
+        self.content_column = model.content_column;
+        self.label_column = model.label_column;
+        self.negative_label = model.negative_label;
         self.positive_label = model.positive_label;
         self.positive_probability = model.positive_probability;
         self.positive_likelihoods = model.positive_likelihoods;
@@ -79,6 +108,9 @@ impl Classifier {
     ) -> Result<(), Box<dyn Error>> {
         let model = serde_json::from_str::<Classifier>(model_string)?;
         self.alpha = model.alpha;
+        self.content_column = model.content_column;
+        self.label_column = model.label_column;
+        self.negative_label = model.negative_label;
         self.positive_label = model.positive_label;
         self.positive_probability = model.positive_probability;
         self.positive_likelihoods = model.positive_likelihoods;
@@ -88,7 +120,7 @@ impl Classifier {
         Ok(())
     }
 
-    pub fn train(&mut self, corpus: Corpus, positive_label: &str) -> Result<(), Box<dyn Error>> {
+    pub fn train(&mut self, corpus: DataFrame, positive_label: &str) -> Result<(), Box<dyn Error>> {
         let mut positive_record_count = 0;
         let mut negative_record_count = 0;
         let mut record_count = 0;
@@ -96,21 +128,31 @@ impl Classifier {
 
         let mut positive_word_frequencies: HashMap<String, u32> = HashMap::new();
         let mut negative_word_frequencies: HashMap<String, u32> = HashMap::new();
+        println!("PREPROCESSING");
+        let processed_corpus = self.preprocess_corpus(corpus)?;
 
-        if corpus.content.len() != corpus.labels.len() {
-            return Err(Box::from(
-                "Number of labels in corpus does not match the amount of content",
-            ));
-        }
+        let content_column = processed_corpus
+            .column(self.content_column.as_str())?
+            .str()?;
 
-        for (_, (content, label)) in corpus.content.iter().zip(corpus.labels.iter()).enumerate() {
+        let label_column = processed_corpus
+            .column(self.label_column.as_str())?
+            .cast(&DataType::String)?;
+        let label_column = label_column.str()?;
+
+        println!("TRAINING");
+        for (content, label) in content_column.iter().zip(label_column.iter()) {
+            let (Some(content), Some(label)) = (content, label) else {
+                continue;
+            };
+
             let tokens = Self::tokenise(content);
             let unique_tokens: HashSet<&str> = tokens.iter().copied().collect();
             unique_words.extend(unique_tokens);
             let mut word_frequencies = &mut negative_word_frequencies;
             let mut count = &mut negative_record_count;
 
-            if *label == positive_label {
+            if label == positive_label {
                 word_frequencies = &mut positive_word_frequencies;
                 count = &mut positive_record_count;
             }
@@ -150,6 +192,11 @@ impl Classifier {
             );
         }
 
+        let mut sorted: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        println!("{:#?}", sorted);
+
         self.positive_unseen_likelihood =
             self.alpha as f64 / (positive_word_count as f64 + self.alpha * word_count as f64);
         self.negative_unseen_likelihood =
@@ -158,52 +205,63 @@ impl Classifier {
         Ok(())
     }
 
+    fn preprocess_corpus(&self, corpus: DataFrame) -> Result<DataFrame, Box<dyn Error>> {
+        let content_column = self.content_column.as_str();
+        let processed_corpus = corpus.lazy().with_columns([col(content_column).map(
+            move |c| {
+                let ca = c.str()?;
+                let out: StringChunked = ca.apply_values(|t| Self::preprocess_text(t).into());
+
+                Ok(out.into_column())
+            },
+            |_schema, field| Ok(field.clone()),
+        )]);
+
+        Ok(processed_corpus.collect()?)
+    }
+
+    fn preprocess_text(text: &str) -> String {
+        let stop_words: HashSet<&str> = get(Language::English).iter().map(|s| *s).collect();
+
+        // Remove stop words
+        let without_stop_words = text
+            .split_whitespace()
+            .filter(|w| !stop_words.contains(w.to_lowercase().as_str()))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Remove all other characters not in the KEEP_REGEX
+        // KEEP_REGEX also keeps emails and emoticons that otherwise would have been stripped
+        KEEP_REGEX
+            .replace_all(&without_stop_words, |caps: &regex::Captures| {
+                if caps.get(4).is_none() {
+                    caps[0].to_string()
+                } else {
+                    " ".to_string()
+                }
+            })
+            .into_owned()
+    }
+
     pub fn parse_csv(
-        &self,
+        &mut self,
         path: &str,
         content_column: &str,
         label_column: &str,
-    ) -> Result<Corpus, Box<dyn Error>> {
-        let mut reader = Reader::from_path(path)?;
+    ) -> Result<DataFrame, Box<dyn Error>> {
         let mut df = CsvReadOptions::default()
             .with_has_header(true)
             .try_into_reader_with_file_path(Some(path.into()))?
             .finish()?;
         df = df.drop_nulls(Some(&[content_column]))?;
-        df = df.lazy().with_column  
-
-
-        let headers = reader
-            .headers()
-            .expect("Failed to read headers of CSV file");
-
-        let column_present = |s: &str| headers.iter().any(|c| c == s);
-        if !column_present(content_column) || !column_present(label_column) {
-            return Err(Box::from("Columns are missing from CSV file"));
-        }
-
-        let find_column_position = |s: &str| headers.iter().position(|c| c == s);
-        let content_column_position = find_column_position(content_column).unwrap();
-        let label_column_position = find_column_position(label_column).unwrap();
-
-        let mut corpus = Corpus {
-            content: Vec::new(),
-            labels: Vec::new(),
-        };
-
-        for result in reader.records() {
-            let record = result.unwrap();
-            let content = &record[content_column_position];
-            let label = &record[label_column_position];
-            corpus.content.push(content.to_string());
-            corpus.labels.push(label.to_string());
-        }
-
-        Ok(corpus)
+        self.content_column = content_column.to_string();
+        self.label_column = label_column.to_string();
+        Ok(df)
     }
 
     pub fn predict(&self, text: &str) -> bool {
-        let tokens = Self::tokenise(text);
+        let processed = Self::preprocess_text(text);
+        let tokens = Self::tokenise(&processed);
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
 
@@ -241,8 +299,10 @@ impl Classifier {
         positive_probability_normalised > negative_probability_normalised
     }
 
+    // Split text into tokens including stripping trailing punctuation as their own token
+    // i.e hello! becomes "hello", "!"
     fn tokenise(text: &str) -> Vec<&str> {
-        let tokens: Vec<&str> = TOKEN_REGEX
+        let tokens: Vec<&str> = TRAILING_PUNCTUATION_REGEX
             .find_iter(text)
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();

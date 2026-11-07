@@ -10,54 +10,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let label_column = "label";
     let positive_label = "1";
     let k: usize = 10;
-    let _ = cross_validation(k, content_column, label_column, positive_label);
-    // let mut classifier = Classifier::new();
-    // let corpus = classifier.parse_csv(
-    //     "src/data/assassin_cleaned_alt.csv",
-    //     content_column,
-    //     label_column,
-    // )?;
-    // println!("Training model");
-    // let _ = classifier.train(corpus, positive_label)?;
-    // println!("Training completed");
-    // let _ = classifier.save_model("model.json")?;
-    // println!("Loading pretrained model");
-    // let _ = classifier.load_pretrained("model.json")?;
-    // println!("Running cross validation");
+    let mut classifier = Classifier::new();
+    let corpus = classifier.parse_csv("src/data/Ling.csv", content_column, label_column)?;
+    println!("Training model");
+    let _ = classifier.train(corpus, positive_label)?;
+    println!("Training completed");
+    let _ = classifier.save_model("model.json")?;
+    println!("Loading pretrained model");
+    let _ = classifier.load_pretrained("model.json")?;
+    println!("Running cross validation");
 
-    //     let mut false_positive_count = 0.0;
-    //     let mut false_negative_count = 0.0;
-    //     let mut true_positive_count = 0.0;
+    let mut false_positive_count = 0.0;
+    let mut false_negative_count = 0.0;
+    let mut true_positive_count = 0.0;
 
-    //     let mut reader = Reader::from_path("src/data/assassin_cleaned.csv")?;
-    //     let headers = reader.headers()?;
-    //     let find_column_position = |s: &str| headers.iter().position(|c| c == s);
-    //     let content_column_position = find_column_position(content_column).unwrap();
-    //     let label_column_position = find_column_position(label_column).unwrap();
-    //     println!("Calculating metrics");
-    //     for result in reader.records() {
-    //         let record = result?;
-    //         let content = &record[content_column_position];
-    //         let is_positive = classifier.predict(content);
-    //         let actual = if &record[label_column_position] == positive_label {
-    //             true
-    //         } else {
-    //             false
-    //         };
+    let mut reader = Reader::from_path("src/data/assassin_cleaned.csv")?;
+    let headers = reader.headers()?;
+    let find_column_position = |s: &str| headers.iter().position(|c| c == s);
+    let content_column_position = find_column_position(content_column).unwrap();
+    let label_column_position = find_column_position(label_column).unwrap();
+    println!("Calculating metrics");
+    for result in reader.records() {
+        let record = result?;
+        let content = &record[content_column_position];
+        let is_positive = classifier.predict(content);
+        let actual = if &record[label_column_position] == positive_label {
+            true
+        } else {
+            false
+        };
 
-    //         if is_positive && actual {
-    //             true_positive_count += 1.0;
-    //         } else if is_positive && !actual {
-    //             false_positive_count += 1.0;
-    //         } else if !is_positive && actual {
-    //             false_negative_count += 1.0;
-    //         }
-    //     }
+        if is_positive && actual {
+            true_positive_count += 1.0;
+        } else if is_positive && !actual {
+            false_positive_count += 1.0;
+        } else if !is_positive && actual {
+            false_negative_count += 1.0;
+        }
+    }
 
-    //     let precision = true_positive_count / (true_positive_count + false_positive_count);
-    //     let recall = true_positive_count / (true_positive_count + false_negative_count);
-    //     let f1 = 2.0 * precision * recall / (precision + recall);
-    //     println!("PRECISION: {}\nRECALL: {}\nF1: {}", precision, recall, f1);
+    let precision = true_positive_count / (true_positive_count + false_positive_count);
+    let recall = true_positive_count / (true_positive_count + false_negative_count);
+    let f1 = 2.0 * precision * recall / (precision + recall);
+    println!(
+        "PRECISION: {}\nRECALL:    {}\nF1:        {}",
+        precision, recall, f1
+    );
 
     Ok(())
 }
