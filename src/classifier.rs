@@ -1,11 +1,11 @@
 use polars::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
-use std::ops::Index;
 use std::sync::LazyLock;
 use stop_words::{Language, get};
 
@@ -121,87 +121,42 @@ impl Classifier {
     }
 
     pub fn train(&mut self, corpus: DataFrame, positive_label: &str) -> Result<(), Box<dyn Error>> {
+        println!("PREPROCESSING");
+        let processed = self.preprocess_corpus(corpus)?;
         let mut positive_record_count = 0;
         let mut negative_record_count = 0;
         let mut record_count = 0;
         let mut unique_words: HashSet<&str> = HashSet::new();
-
         let mut positive_word_frequencies: HashMap<String, u32> = HashMap::new();
         let mut negative_word_frequencies: HashMap<String, u32> = HashMap::new();
-        println!("PREPROCESSING");
-        let processed_corpus = self.preprocess_corpus(corpus)?;
 
-        let content_column = processed_corpus
-            .column(self.content_column.as_str())?
-            .str()?;
+        let label_column_name = &self.label_column;
+        let content_column_name = &self.content_column;
+        println!("TOKENISING");
+        println!("Calculating word counts");
+        let word_counts = processed
+            .lazy()
+            .select([
+                col(label_column_name),
+                col(content_column_name)
+                    .str()
+                    .extract_all(lit(r"\w+|[^\w\s]"))
+                    .alias("tokens"),
+            ])
+            .explode(
+                by_name(["tokens"], true, true),
+                ExplodeOptions {
+                    empty_as_null: true,
+                    keep_nulls: true,
+                },
+            )
+            .group_by([col(label_column_name), col("tokens")])
+            .agg([len().alias("count")])
+            .collect()?;
 
-        let label_column = processed_corpus
-            .column(self.label_column.as_str())?
-            .cast(&DataType::String)?;
-        let label_column = label_column.str()?;
+        println!("{:#?}", word_counts);
 
-        println!("TRAINING");
-        for (content, label) in content_column.iter().zip(label_column.iter()) {
-            let (Some(content), Some(label)) = (content, label) else {
-                continue;
-            };
-
-            let tokens = Self::tokenise(content);
-            let unique_tokens: HashSet<&str> = tokens.iter().copied().collect();
-            unique_words.extend(unique_tokens);
-            let mut word_frequencies = &mut negative_word_frequencies;
-            let mut count = &mut negative_record_count;
-
-            if label == positive_label {
-                word_frequencies = &mut positive_word_frequencies;
-                count = &mut positive_record_count;
-            }
-
-            *count += 1;
-            for w in tokens {
-                let _ = *word_frequencies
-                    .entry(String::from(w))
-                    .and_modify(|f| *f += 1)
-                    .or_insert(1);
-            }
-            record_count += 1;
-        }
-
-        let word_count: u32 = unique_words.len() as u32;
-        let positive_word_count: u32 = positive_word_frequencies.values().sum();
-        let negative_word_count: u32 = negative_word_frequencies.values().sum();
-        let positive_probability = positive_record_count as f64 / record_count as f64;
-        self.positive_probability = positive_probability;
-
-        // Compute conditional/likelihood probabilities
-        for word in unique_words {
-            // Get frequency of each word in the positive and negative samples
-            // then apply laplace smoothing
-            let frequency_positive = positive_word_frequencies.get(word).unwrap_or(&0);
-            let frequency_negative = negative_word_frequencies.get(word).unwrap_or(&0);
-            self.positive_likelihoods.insert(
-                word.to_string(),
-                (*frequency_positive as f64 + self.alpha)
-                    / (positive_word_count as f64 + self.alpha * word_count as f64),
-            );
-
-            self.negative_likelihoods.insert(
-                word.to_string(),
-                (*frequency_negative as f64 + self.alpha)
-                    / (negative_word_count as f64 + self.alpha * word_count as f64),
-            );
-        }
-
-        let mut sorted: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
-        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
-
-        println!("{:#?}", sorted);
-
-        self.positive_unseen_likelihood =
-            self.alpha as f64 / (positive_word_count as f64 + self.alpha * word_count as f64);
-        self.negative_unseen_likelihood =
-            self.alpha as f64 / (positive_word_count as f64 + self.alpha * word_count as f64);
-
+        println!("Done");
         Ok(())
     }
 
