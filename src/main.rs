@@ -9,18 +9,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let content_column = "body";
     let label_column = "label";
     let positive_label = "1";
+    let negative_label = "0";
     let k: usize = 10;
     let mut classifier = Classifier::new();
-    let corpus = classifier.parse_csv("src/data/Ling.csv", content_column, label_column)?;
+    let corpus = classifier.parse_csv(
+        "src/data/Ling.csv",
+        content_column,
+        label_column,
+        positive_label,
+        negative_label,
+    )?;
     println!("Training model");
-    let _ = classifier.train(corpus, positive_label)?;
+    let _ = classifier.train(corpus)?;
     println!("Training completed");
     // let _ = classifier.save_model("model.json")?;
     // println!("Loading pretrained model");
     // let _ = classifier.load_pretrained("model.json")?;
 
-    println!("Running cross validation");
-    let _ = cross_validation(k, content_column, label_column, positive_label);
+    // println!("Running cross validation");
+    // let _ = cross_validation(
+    //     k,
+    //     content_column,
+    //     label_column,
+    //     positive_label,
+    //     negative_label,
+    // );
 
     // let mut false_positive_count = 0.0;
     // let mut false_negative_count = 0.0;
@@ -100,6 +113,7 @@ fn cross_validation(
     content_column: &str,
     label_column: &str,
     positive_label: &str,
+    negative_label: &str,
 ) -> Result<(), Box<dyn Error>> {
     let paths = split_csv(k).unwrap();
 
@@ -120,9 +134,14 @@ fn cross_validation(
         merge_csv_chunks(&paths, i, train_path.to_str().unwrap())?;
 
         let mut fold_classifier = Classifier::new();
-        let corpus =
-            fold_classifier.parse_csv(train_path.to_str().unwrap(), content_column, label_column);
-        let _ = fold_classifier.train(corpus.unwrap(), "1");
+        let corpus = fold_classifier.parse_csv(
+            train_path.to_str().unwrap(),
+            content_column,
+            label_column,
+            positive_label,
+            negative_label,
+        );
+        let _ = fold_classifier.train(corpus.unwrap());
 
         let mut false_positive_count: f64 = 0.0;
         let mut false_negative_count: f64 = 0.0;

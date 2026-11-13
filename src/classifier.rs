@@ -1,7 +1,6 @@
 use polars::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
@@ -120,9 +119,11 @@ impl Classifier {
         Ok(())
     }
 
-    pub fn train(&mut self, corpus: DataFrame, positive_label: &str) -> Result<(), Box<dyn Error>> {
+    pub fn train(&mut self, corpus: DataFrame) -> Result<(), Box<dyn Error>> {
         println!("PREPROCESSING");
         let processed = self.preprocess_corpus(corpus)?;
+
+        println!("{:#?}", processed);
         let mut positive_record_count = 0;
         let mut negative_record_count = 0;
         let mut record_count = 0;
@@ -130,15 +131,18 @@ impl Classifier {
         let mut positive_word_frequencies: HashMap<String, u32> = HashMap::new();
         let mut negative_word_frequencies: HashMap<String, u32> = HashMap::new();
 
-        let label_column_name = &self.label_column;
-        let content_column_name = &self.content_column;
+        let label_column = &self.label_column;
+        let content_column = &self.content_column;
+        let positive_label = &self.positive_label;
+        let negative_label = &self.negative_label;
         println!("TOKENISING");
         println!("Calculating word counts");
-        let word_counts = processed
+
+        let words = processed
             .lazy()
             .select([
-                col(label_column_name),
-                col(content_column_name)
+                col(label_column).cast(DataType::String),
+                col(content_column)
                     .str()
                     .extract_all(lit(r"\w+|[^\w\s]"))
                     .alias("tokens"),
@@ -150,12 +154,59 @@ impl Classifier {
                     keep_nulls: true,
                 },
             )
-            .group_by([col(label_column_name), col("tokens")])
-            .agg([len().alias("count")])
+            .group_by([col("tokens")])
+            .agg([
+                col(label_column)
+                    .eq(lit(positive_label.as_str()))
+                    .sum()
+                    .cast(DataType::Float64)
+                    .alias("positive_counts"),
+                col(label_column)
+                    .eq(lit(negative_label.as_str()))
+                    .sum()
+                    .cast(DataType::Float64)
+                    .alias("negative_counts"),
+            ])
             .collect()?;
 
-        println!("{:#?}", word_counts);
+        println!("{:#?}", words);
+        let word_count = words.column("tokens")?.len() as f64;
+        let positive_word_count = words.column("positive_counts")?.len() as f64;
+        let negative_word_count = words.column("negative_counts")?.len() as f64;
 
+        println!("Calculating likelihoods");
+        let tokens = words.column("tokens")?.str()?;
+        let positive_counts = words.column("positive_counts")?.f64()?;
+        let negative_counts = words.column("negative_counts")?.f64()?;
+
+        for ((token, positive_count), negative_count) in tokens
+            .iter()
+            .zip(positive_counts.iter())
+            .zip(negative_counts.iter())
+        {
+            if let (Some(token), Some(positive_count), Some(negative_count)) =
+                (token, positive_count, negative_count)
+            {
+                self.positive_likelihoods.insert(
+                    token.to_string(),
+                    (positive_count + self.alpha) / (positive_count + self.alpha * word_count),
+                );
+                self.negative_likelihoods.insert(
+                    token.to_string(),
+                    (negative_count + self.alpha) / (negative_count + self.alpha * word_count),
+                );
+            }
+        }
+
+        let mut sorted: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        // println!("{:#?}", sorted);
+
+        self.positive_unseen_likelihood =
+            self.alpha / (positive_word_count + self.alpha * word_count);
+        self.negative_unseen_likelihood =
+            self.alpha / (negative_word_count + self.alpha * word_count);
         println!("Done");
         Ok(())
     }
@@ -203,6 +254,8 @@ impl Classifier {
         path: &str,
         content_column: &str,
         label_column: &str,
+        positive_label: &str,
+        negative_label: &str,
     ) -> Result<DataFrame, Box<dyn Error>> {
         let mut df = CsvReadOptions::default()
             .with_has_header(true)
@@ -211,6 +264,8 @@ impl Classifier {
         df = df.drop_nulls(Some(&[content_column]))?;
         self.content_column = content_column.to_string();
         self.label_column = label_column.to_string();
+        self.positive_label = positive_label.to_string();
+        self.negative_label = negative_label.to_string();
         Ok(df)
     }
 
