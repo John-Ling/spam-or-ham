@@ -120,23 +120,38 @@ impl Classifier {
     }
 
     pub fn train(&mut self, corpus: DataFrame) -> Result<(), Box<dyn Error>> {
-        println!("PREPROCESSING");
         let processed = self.preprocess_corpus(corpus)?;
-
-        println!("{:#?}", processed);
-        let mut positive_record_count = 0;
-        let mut negative_record_count = 0;
-        let mut record_count = 0;
-        let mut unique_words: HashSet<&str> = HashSet::new();
-        let mut positive_word_frequencies: HashMap<String, u32> = HashMap::new();
-        let mut negative_word_frequencies: HashMap<String, u32> = HashMap::new();
-
         let label_column = &self.label_column;
         let content_column = &self.content_column;
         let positive_label = &self.positive_label;
         let negative_label = &self.negative_label;
-        println!("TOKENISING");
-        println!("Calculating word counts");
+
+        let string_typed_label = || col(label_column).cast(DataType::String);
+        let positive_negative_record_counts = processed
+            .clone()
+            .lazy()
+            .select([
+                string_typed_label()
+                    .filter(string_typed_label().eq(lit(positive_label.as_str())))
+                    .len()
+                    .alias("positive_count"),
+                string_typed_label()
+                    .filter(string_typed_label().eq(lit(negative_label.as_str())))
+                    .len()
+                    .alias("negative_count"),
+            ])
+            .collect()?;
+
+        let total_positive_records = positive_negative_record_counts
+            .column("positive_count")?
+            .get(0)?
+            .try_extract::<f64>()?;
+        let total_negative_records = positive_negative_record_counts
+            .column("negative_count")?
+            .get(0)?
+            .try_extract::<f64>()?;
+        let total_record_count = total_positive_records + total_negative_records;
+        self.positive_probability = total_positive_records / total_record_count;
 
         let words = processed
             .lazy()
@@ -169,12 +184,10 @@ impl Classifier {
             ])
             .collect()?;
 
-        println!("{:#?}", words);
         let word_count = words.column("tokens")?.len() as f64;
         let positive_word_count = words.column("positive_counts")?.len() as f64;
         let negative_word_count = words.column("negative_counts")?.len() as f64;
 
-        println!("Calculating likelihoods");
         let tokens = words.column("tokens")?.str()?;
         let positive_counts = words.column("positive_counts")?.f64()?;
         let negative_counts = words.column("negative_counts")?.f64()?;
@@ -198,8 +211,8 @@ impl Classifier {
             }
         }
 
-        let mut sorted: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
-        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
+        // let mut sorted: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
+        // sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // println!("{:#?}", sorted);
 
@@ -207,7 +220,6 @@ impl Classifier {
             self.alpha / (positive_word_count + self.alpha * word_count);
         self.negative_unseen_likelihood =
             self.alpha / (negative_word_count + self.alpha * word_count);
-        println!("Done");
         Ok(())
     }
 
@@ -274,7 +286,8 @@ impl Classifier {
         let tokens = Self::tokenise(&processed);
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
-
+        println!("{}", positive_probability);
+        println!("{}", negative_probability);
         for token in tokens {
             let likelihood_positive = self.positive_likelihoods.get(token);
             let likelihood_negative = self.negative_likelihoods.get(token);

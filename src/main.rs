@@ -22,18 +22,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Training model");
     let _ = classifier.train(corpus)?;
     println!("Training completed");
-    // let _ = classifier.save_model("model.json")?;
-    // println!("Loading pretrained model");
-    // let _ = classifier.load_pretrained("model.json")?;
+    let _ = classifier.save_model("model.json")?;
+    println!("Loading pretrained model");
+    let _ = classifier.load_pretrained("model.json")?;
 
-    // println!("Running cross validation");
-    // let _ = cross_validation(
-    //     k,
-    //     content_column,
-    //     label_column,
-    //     positive_label,
-    //     negative_label,
-    // );
+    println!("Running cross validation");
+    let _ = cross_validation(
+        k,
+        content_column,
+        label_column,
+        positive_label,
+        negative_label,
+    );
 
     // let mut false_positive_count = 0.0;
     // let mut false_negative_count = 0.0;
