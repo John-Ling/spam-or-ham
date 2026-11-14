@@ -127,6 +127,8 @@ impl Classifier {
         let negative_label = &self.negative_label;
 
         let string_typed_label = || col(label_column).cast(DataType::String);
+
+        // Get total count of positive and negative records
         let positive_negative_record_counts = processed
             .clone()
             .lazy()
@@ -146,14 +148,17 @@ impl Classifier {
             .column("positive_count")?
             .get(0)?
             .try_extract::<f64>()?;
+
         let total_negative_records = positive_negative_record_counts
             .column("negative_count")?
             .get(0)?
             .try_extract::<f64>()?;
+
         let total_record_count = total_positive_records + total_negative_records;
         self.positive_probability = total_positive_records / total_record_count;
 
-        let words = processed
+        // Calculate frequency of words in positive and negative records
+        let per_word_counts = processed
             .lazy()
             .select([
                 col(label_column).cast(DataType::String),
@@ -184,29 +189,39 @@ impl Classifier {
             ])
             .collect()?;
 
-        let word_count = words.column("tokens")?.len() as f64;
-        let positive_word_count = words.column("positive_counts")?.len() as f64;
-        let negative_word_count = words.column("negative_counts")?.len() as f64;
+        let unique_word_count = per_word_counts.column("tokens")?.len() as f64;
+        let total_positive_words = per_word_counts
+            .column("positive_counts")?
+            .f64()?
+            .sum()
+            .unwrap();
+        let total_negative_words = per_word_counts
+            .column("negative_counts")?
+            .f64()?
+            .sum()
+            .unwrap();
 
-        let tokens = words.column("tokens")?.str()?;
-        let positive_counts = words.column("positive_counts")?.f64()?;
-        let negative_counts = words.column("negative_counts")?.f64()?;
-
-        for ((token, positive_count), negative_count) in tokens
+        // Calculate likelihoods
+        let positive_counts_per_word = per_word_counts.column("positive_counts")?.f64()?;
+        let negative_counts_per_word = per_word_counts.column("negative_counts")?.f64()?;
+        let words = per_word_counts.column("tokens")?.str()?;
+        for ((token, positive_count), negative_count) in words
             .iter()
-            .zip(positive_counts.iter())
-            .zip(negative_counts.iter())
+            .zip(positive_counts_per_word.iter())
+            .zip(negative_counts_per_word.iter())
         {
             if let (Some(token), Some(positive_count), Some(negative_count)) =
                 (token, positive_count, negative_count)
             {
                 self.positive_likelihoods.insert(
                     token.to_string(),
-                    (positive_count + self.alpha) / (positive_count + self.alpha * word_count),
+                    (positive_count + self.alpha)
+                        / (total_positive_words + self.alpha * unique_word_count),
                 );
                 self.negative_likelihoods.insert(
                     token.to_string(),
-                    (negative_count + self.alpha) / (negative_count + self.alpha * word_count),
+                    (negative_count + self.alpha)
+                        / (total_negative_words + self.alpha * unique_word_count),
                 );
             }
         }
@@ -217,9 +232,9 @@ impl Classifier {
         // println!("{:#?}", sorted);
 
         self.positive_unseen_likelihood =
-            self.alpha / (positive_word_count + self.alpha * word_count);
+            self.alpha / (total_positive_words + self.alpha * unique_word_count);
         self.negative_unseen_likelihood =
-            self.alpha / (negative_word_count + self.alpha * word_count);
+            self.alpha / (total_negative_words + self.alpha * unique_word_count);
         Ok(())
     }
 
@@ -286,8 +301,6 @@ impl Classifier {
         let tokens = Self::tokenise(&processed);
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
-        println!("{}", positive_probability);
-        println!("{}", negative_probability);
         for token in tokens {
             let likelihood_positive = self.positive_likelihoods.get(token);
             let likelihood_negative = self.negative_likelihoods.get(token);
