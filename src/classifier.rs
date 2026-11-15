@@ -201,28 +201,28 @@ impl Classifier {
             .sum()
             .unwrap();
 
-        // Calculate likelihoods
-        let positive_counts_per_word = per_word_counts.column("positive_counts")?.f64()?;
-        let negative_counts_per_word = per_word_counts.column("negative_counts")?.f64()?;
-        let words = per_word_counts.column("tokens")?.str()?;
-        for ((token, positive_count), negative_count) in words
-            .iter()
-            .zip(positive_counts_per_word.iter())
-            .zip(negative_counts_per_word.iter())
-        {
-            if let (Some(token), Some(positive_count), Some(negative_count)) =
-                (token, positive_count, negative_count)
-            {
-                self.positive_likelihoods.insert(
-                    token.to_string(),
-                    (positive_count + self.alpha)
-                        / (total_positive_words + self.alpha * unique_word_count),
-                );
-                self.negative_likelihoods.insert(
-                    token.to_string(),
-                    (negative_count + self.alpha)
-                        / (total_negative_words + self.alpha * unique_word_count),
-                );
+        let v = unique_word_count;
+        let alpha = self.alpha;
+        let likelihoods = per_word_counts
+            .clone()
+            .lazy()
+            .select([
+                col("tokens"),
+                ((col("positive_counts") + lit(alpha)) / lit(total_positive_words + alpha * v))
+                    .alias("pos_lik"),
+                ((col("negative_counts") + lit(alpha)) / lit(total_negative_words + alpha * v))
+                    .alias("neg_lik"),
+            ])
+            .collect()?;
+
+        let words = likelihoods.column("tokens")?.str()?;
+        let pos = likelihoods.column("pos_lik")?.f64()?;
+        let neg = likelihoods.column("neg_lik")?.f64()?;
+
+        for ((token, p), n) in words.iter().zip(pos.iter()).zip(neg.iter()) {
+            if let (Some(token), Some(p), Some(n)) = (token, p, n) {
+                self.positive_likelihoods.insert(token.to_string(), p);
+                self.negative_likelihoods.insert(token.to_string(), n);
             }
         }
 

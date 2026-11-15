@@ -12,19 +12,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let negative_label = "0";
     let k: usize = 10;
     let mut classifier = Classifier::new();
-    let corpus = classifier.parse_csv(
-        "src/data/Ling.csv",
-        content_column,
-        label_column,
-        positive_label,
-        negative_label,
-    )?;
-    println!("Training model");
-    let _ = classifier.train(corpus)?;
-    println!("Training completed");
+    // let corpus = classifier.parse_csv(
+    //     "src/data/Ling.csv",
+    //     content_column,
+    //     label_column,
+    //     positive_label,
+    //     negative_label,
+    // )?;
+    // println!("Training model");
+    // let _ = classifier.train(corpus)?;
+    // println!("Training completed");
     // let _ = classifier.save_model("model.json")?;
-    // println!("Loading pretrained model");
-    // let _ = classifier.load_pretrained("model.json")?;
+    println!("Loading pretrained model");
+    let _ = classifier.load_pretrained("model.json")?;
+
+    println!("Classifying");
+    println!(
+        "{}",
+        classifier.predict(
+            "
+         WE NEED HELP.  We are a 14 year old fortune 500 company, and we have
+    grown 1000%!  We cannot keep up.  We are looking for individuals who
+    want to work at home, and make a good living.
+
+    So if you are looking to be employed from home with a career that has
+    vast opportunities, then go:
+
+    http://www.lotsonet.com/opportunity
+
+    and fill out our info form.  NO EXPERIENCE REQUIRED, WE WILL TRAIN YOU.
+    NO COMMITTMENT IS REQUIRED BY FILLING OUT THE FORM, IT IS FOR INFO
+    ONLY.
+
+    http://www.lotsonet.com/opportunity
+
+    You want to be independent?  THEN MAKE IT HAPPEN!
+    HAPPEN!
+
+        "
+        )
+    );
+
+    println!(
+            "{}",
+            classifier.predict(
+                "
+
+    the georgetown arabic department of the school of languages and linguistics will host intensive courses in modern standard arabic worth 12 undergraduate credits . elem , interm . , advanced and a course in arabic - eng . translation will be offered . for pamphlet , contact : belkacem baccouche , director , georgetown university , arabic dept . , washington , d . c . 20057-1082 . ( 202 ) 687-5743
+        "
+            )
+        );
 
     // println!("Running cross validation");
     // let _ = cross_validation(
@@ -34,6 +71,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     positive_label,
     //     negative_label,
     // );
+
+    Ok(())
+}
+
+fn single_test_with_pretrained(
+    content_column: &str,
+    label_column: &str,
+    positive_label: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut classifier = Classifier::new();
+    let _ = classifier.load_pretrained("model.json")?;
 
     let mut false_positive_count = 0.0;
     let mut false_negative_count = 0.0;
@@ -71,12 +119,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "PRECISION: {}\nRECALL:    {}\nF1:        {}",
         precision, recall, f1
     );
-
     Ok(())
 }
 
 fn split_csv(k: usize) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let mut reader = Reader::from_path("src/data/Ling.csv")?;
+    let mut reader = Reader::from_path("src/data/Assassin.csv")?;
     let headers = reader.headers()?.clone();
     let records: Vec<csv::StringRecord> = reader.records().collect::<Result<_, _>>()?;
     let n = records.len();
