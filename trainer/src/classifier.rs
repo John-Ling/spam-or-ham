@@ -41,9 +41,9 @@ static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 impl Classifier {
-    pub fn new() -> Self {
+    pub fn new(alpha: f64) -> Self {
         Self {
-            alpha: 1.0,
+            alpha: alpha,
             content_column: String::from(""),
             label_column: String::from(""),
             negative_label: String::from(""),
@@ -204,15 +204,15 @@ impl Classifier {
             .select([
                 col("tokens"),
                 ((col("positive_counts") + lit(alpha)) / lit(total_positive_words + alpha * v))
-                    .alias("pos_lik"),
+                    .alias("positive_likelihoods"),
                 ((col("negative_counts") + lit(alpha)) / lit(total_negative_words + alpha * v))
-                    .alias("neg_lik"),
+                    .alias("negative_likelihoods"),
             ])
             .collect()?;
 
         let words = likelihoods.column("tokens")?.str()?;
-        let pos = likelihoods.column("pos_lik")?.f64()?;
-        let neg = likelihoods.column("neg_lik")?.f64()?;
+        let pos = likelihoods.column("positive_likelihoods")?.f64()?;
+        let neg = likelihoods.column("negative_likelihoods")?.f64()?;
 
         for ((token, p), n) in words.iter().zip(pos.iter()).zip(neg.iter()) {
             if let (Some(token), Some(p), Some(n)) = (token, p, n) {
@@ -220,11 +220,6 @@ impl Classifier {
                 self.negative_likelihoods.insert(token.to_string(), n);
             }
         }
-
-        // let mut sorted: Vec<(&String, &f64)> = self.positive_likelihoods.iter().collect();
-        // sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
-
-        // println!("{:#?}", sorted);
 
         self.positive_unseen_likelihood =
             self.alpha / (total_positive_words + self.alpha * unique_word_count);
@@ -297,6 +292,7 @@ impl Classifier {
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
         for token in tokens {
+            let token = token.as_str();
             let likelihood_positive = self.positive_likelihoods.get(token);
             let likelihood_negative = self.negative_likelihoods.get(token);
 
@@ -327,18 +323,24 @@ impl Classifier {
 
         let positive_probability_normalised = (positive_probability - log_probability_sum).exp();
         let negative_probability_normalised = (negative_probability - log_probability_sum).exp();
+
         positive_probability_normalised > negative_probability_normalised
     }
 
     // Split text into tokens including stripping trailing punctuation as their own token
     // i.e hello! becomes "hello", "!"
-    fn tokenise(text: &str) -> Vec<&str> {
-        let tokens: Vec<&str> = TRAILING_PUNCTUATION_REGEX
+    fn tokenise(text: &str) -> Vec<String> {
+        let t: Vec<&str> = TRAILING_PUNCTUATION_REGEX
             .find_iter(text)
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
+
+        let tokens = t.iter().map(|t| t.to_string()).collect::<Vec<String>>();
+        // let bigrams = t
+        //     .windows(2)
+        //     .map(|w| format!("{}_{}", w[0], w[1]))
+        //     .collect::<Vec<String>>();
         return tokens;
-        // let bigrams = tokens.windows(2).map(|w| (w[0], w[1])).collect();
-        // return bigrams;
+        // return [tokens].concat();
     }
 }

@@ -1,93 +1,137 @@
 mod classifier;
-use std::{error::Error, path::PathBuf};
-
 use classifier::Classifier;
 use csv::Reader;
+use std::{error::Error, path::PathBuf};
 use tempfile::NamedTempFile;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
+    // let _ = nuance_test(0.55);
+    // let _ = cross_validation(0.55);
+    // let _ = single_test(false);
+    let _ = train_and_save();
+    Ok(())
+}
+
+fn train_and_save() -> Result<(), Box<dyn Error>> {
     let content_column = "body";
     let label_column = "label";
     let positive_label = "1";
     let negative_label = "0";
-    let k: usize = 10;
-    let mut classifier = Classifier::new();
-    // let corpus = classifier.parse_csv(
-    //     "src/data/Ling.csv",
-    //     content_column,
-    //     label_column,
-    //     positive_label,
-    //     negative_label,
-    // )?;
-    // println!("Training model");
-    // let _ = classifier.train(corpus)?;
-    // println!("Training completed");
-    // let _ = classifier.save_model("model.json")?;
-    println!("Loading pretrained model");
-    let _ = classifier.load_pretrained("model.json")?;
-
-    println!("Classifying");
-    println!(
-        "{}",
-        classifier.predict(
-            "
-         WE NEED HELP.  We are a 14 year old fortune 500 company, and we have
-    grown 1000%!  We cannot keep up.  We are looking for individuals who
-    want to work at home, and make a good living.
-
-    So if you are looking to be employed from home with a career that has
-    vast opportunities, then go:
-
-    http://www.lotsonet.com/opportunity
-
-    and fill out our info form.  NO EXPERIENCE REQUIRED, WE WILL TRAIN YOU.
-    NO COMMITTMENT IS REQUIRED BY FILLING OUT THE FORM, IT IS FOR INFO
-    ONLY.
-
-    http://www.lotsonet.com/opportunity
-
-    You want to be independent?  THEN MAKE IT HAPPEN!
-    HAPPEN!
-
-        "
-        )
-    );
-
-    println!(
-            "{}",
-            classifier.predict(
-                "
-
-    the georgetown arabic department of the school of languages and linguistics will host intensive courses in modern standard arabic worth 12 undergraduate credits . elem , interm . , advanced and a course in arabic - eng . translation will be offered . for pamphlet , contact : belkacem baccouche , director , georgetown university , arabic dept . , washington , d . c . 20057-1082 . ( 202 ) 687-5743
-        "
-            )
-        );
-
-    // println!("Running cross validation");
-    // let _ = cross_validation(
-    //     k,
-    //     content_column,
-    //     label_column,
-    //     positive_label,
-    //     negative_label,
-    // );
-
+    let mut classifier = Classifier::new(0.55);
+    let corpus = classifier.parse_csv(
+        "trainer/src/data/Ling.csv",
+        content_column,
+        label_column,
+        positive_label,
+        negative_label,
+    )?;
+    println!("Training model");
+    let _ = classifier.train(corpus)?;
+    println!("Training completed");
+    let _ = classifier.save_model("model.json")?;
     Ok(())
 }
 
-fn single_test_with_pretrained(
-    content_column: &str,
-    label_column: &str,
-    positive_label: &str,
-) -> Result<(), Box<dyn Error>> {
-    let mut classifier = Classifier::new();
-    let _ = classifier.load_pretrained("model.json")?;
+fn find_ideal_alpha() {
+    let candidates = [0.0001, 0.001, 0.01, 0.1, 0.5, 1.0, 2.0];
+    for i in 0..candidates.len() {
+        let alpha = *candidates.get(i).unwrap();
+        let _ = cross_validation(alpha);
+    }
+}
+
+fn find_ideal_alpha_nuance_test() {
+    let candidates = [0.0001, 0.001, 0.01, 0.1, 0.5, 1.0, 2.0];
+    for i in 0..candidates.len() {
+        let alpha = *candidates.get(i).unwrap();
+        println!("TESTING α = {}", alpha);
+        let _ = nuance_test(alpha);
+        println!("");
+    }
+}
+
+fn nuance_test(alpha: f64) -> Result<(), Box<dyn Error>> {
+    let mut classifier = Classifier::new(alpha);
+    let corpus = classifier.parse_csv("trainer/src/data/Ling.csv", "body", "label", "1", "0")?;
+    let _ = classifier.train(corpus)?;
+
+    let spam_messages = [
+        "CONGRATULATIONS!!! You are the LUCKY WINNER of $1,000,000 CASH!!! CLICK HERE NOW!!! 100% FREE!!! NO CATCH!!! LIMITED TIME ONLY!!! ACT NOW!!! BUY NOW!!!",
+        "Dear Beloved Friend, I am a lawyer representing the late Mr. Johnson, who died with no heir. I need your help to transfer the funds. Reply with your full name, bank account number and phone number. Strictly confidential.",
+        "Earn money fast with no experience and no investment required. Thousands of people are already getting rich. Sign up now and start earning cash today. Guaranteed income!",
+        "Buy discount pills online with fast discreet shipping. Best prices guaranteed. Order now and save up to 80%. Click here to buy. No doctor visit required!",
+        "You have been chosen as a winner in our customer loyalty draw. To claim your prize, simply verify your identity and provide your bank details. Act now, offer ends soon!",
+        "Your premium membership is about to expire. Renew now to keep your benefits and receive a special discount. Click here to renew before it is too late.",
+        "Dear business owner, join our private webinar and discover the secret strategies top companies use to multiply their revenue. Seats are limited, so register today and unlock your potential.",
+        "We attempted to deliver your parcel today but no one was home. Please confirm your address and pay a small redelivery fee of $1.99 using the link below to reschedule.",
+        "Hello, I'm not sure if you received my last email regarding the outstanding invoice. Could you open the attached document and confirm the payment details are correct? Regards, Accounts Team",
+        "Hi, we noticed some unusual activity on your account. Please review your details at your earliest convenience to avoid any interruption to your service. Thanks, Customer Support",
+    ];
+    println!("RUNNING SPAM NUANCE TEST");
+    let mut outcome: bool;
+    let mut correct = 0;
+    for i in 0..spam_messages.len() {
+        print!("MESSAGE {}: ", i + 1);
+        outcome = classifier.predict(spam_messages.get(i).unwrap());
+        println!("{}", if outcome { "PASSED" } else { "FAILED" });
+        if outcome {
+            correct += 1;
+        }
+    }
+    println!("{}/{} PASSED", correct, spam_messages.len());
+
+    println!("RUNNING NON-SPAM NUANCE TEST");
+    let non_spam_messages = [
+        "Want to grab lunch at the new place around the corner? I was thinking 12:30. Let me know and I will book a table (^_^)",
+        "Hey everyone, I uploaded my notes from today's lecture on conditional probability and Bayes' theorem. The practice problems on page 4 are tricky, so let's go through them on Thursday.",
+        "Hi love, are you free for dinner on Sunday? Dad is making his famous lasagna and the kids would love to see you. Let me know if you can bring dessert. Mum x",
+        "Jordan requested your review on “Fix tokenizer edge case”. The changes add handling for empty strings and include two new unit tests. Please take a look when you have a moment.",
+        "Hi team, the testing phase is complete and we found three bugs, all now fixed. Next week we will start the deployment checklist. Please review the document and send comments by Wednesday.",
+        "Hey, something has come up and I need to reschedule our 2pm catch-up. Would Friday morning work instead? Happy to do a quick call if that is easier. Thanks! :)",
+        "Hi Priya, please find the invoice for September attached. Payment is due within 14 days. Let me know if you need any changes to the details. Cheers, Marcus",
+        "Thanks for your recent purchase! As a returning customer, you get free shipping on orders over $50 for the next 30 days. This offer applies to your account only and expires on 30 November.",
+        "Your October account statement is now available. Please log in to your online banking portal to view it. If you have any questions about a transaction, call the number on the back of your card.",
+        "Hi Sam, good news: your order #48213 has shipped and should arrive within 3-5 business days. You can track your parcel using the tracking number below. Thanks for shopping with us!",
+    ];
+
+    correct = 0;
+    for i in 0..non_spam_messages.len() {
+        print!("MESSAGE {}: ", i + 1);
+        outcome = classifier.predict(non_spam_messages.get(i).unwrap());
+        println!("{}", if outcome { "PASSED" } else { "FAILED" });
+        if outcome {
+            correct += 1;
+        }
+    }
+    println!("{}/{} PASSED", correct, non_spam_messages.len());
+    Ok(())
+}
+
+fn single_test(pretrained: bool) -> Result<(), Box<dyn Error>> {
+    let content_column = "body";
+    let label_column = "label";
+    let positive_label = "1";
+    let negative_label = "0";
+
+    let mut classifier = Classifier::new(0.55);
+    if pretrained {
+        let _ = classifier.load_pretrained("model.json")?;
+    } else {
+        let corpus = classifier.parse_csv(
+            "trainer/src/data/Ling.csv",
+            content_column,
+            label_column,
+            positive_label,
+            negative_label,
+        )?;
+        let _ = classifier.train(corpus);
+    }
 
     let mut false_positive_count = 0.0;
     let mut false_negative_count = 0.0;
     let mut true_positive_count = 0.0;
 
-    let mut reader = Reader::from_path("src/data/assassin_cleaned.csv")?;
+    let mut reader = Reader::from_path("trainer/src/data/Ling.csv")?;
     let headers = reader.headers()?;
     let find_column_position = |s: &str| headers.iter().position(|c| c == s);
     let content_column_position = find_column_position(content_column).unwrap();
@@ -123,7 +167,7 @@ fn single_test_with_pretrained(
 }
 
 fn split_csv(k: usize) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let mut reader = Reader::from_path("src/data/Assassin.csv")?;
+    let mut reader = Reader::from_path("trainer/src/data/Ling.csv")?;
     let headers = reader.headers()?.clone();
     let records: Vec<csv::StringRecord> = reader.records().collect::<Result<_, _>>()?;
     let n = records.len();
@@ -155,13 +199,13 @@ fn split_csv(k: usize) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     Ok(paths)
 }
 
-fn cross_validation(
-    k: usize,
-    content_column: &str,
-    label_column: &str,
-    positive_label: &str,
-    negative_label: &str,
-) -> Result<(), Box<dyn Error>> {
+fn cross_validation(alpha: f64) -> Result<(), Box<dyn Error>> {
+    let content_column = "body";
+    let label_column = "label";
+    let positive_label = "1";
+    let negative_label = "0";
+
+    let k: usize = 10;
     let paths = split_csv(k).unwrap();
 
     let mut average_f1 = 0.0;
@@ -180,7 +224,7 @@ fn cross_validation(
         drop(train_file);
         merge_csv_chunks(&paths, i, train_path.to_str().unwrap())?;
 
-        let mut fold_classifier = Classifier::new();
+        let mut fold_classifier = Classifier::new(alpha);
         let corpus = fold_classifier.parse_csv(
             train_path.to_str().unwrap(),
             content_column,
