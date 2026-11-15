@@ -8,11 +8,6 @@ use std::io::{BufReader, BufWriter};
 use std::sync::LazyLock;
 use stop_words::{Language, get};
 
-pub struct Corpus {
-    content: Vec<String>,
-    labels: Vec<String>,
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
     alpha: f64,

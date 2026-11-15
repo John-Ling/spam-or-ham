@@ -9,9 +9,7 @@ static CLASSIFIER_INSTANCE: OnceLock<Classifier> = OnceLock::new();
 pub fn load_classifier(model_json_string: &str) -> bool {
     let mut classifier = Classifier::new();
 
-    let successful = classifier
-        .load_pretrained_from_string(model_json_string)
-        .is_ok();
+    let successful = classifier.load_pretrained(model_json_string).is_ok();
     CLASSIFIER_INSTANCE.set(classifier).ok();
     return successful;
 }
