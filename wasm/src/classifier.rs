@@ -5,23 +5,27 @@ use std::error::Error;
 use std::sync::LazyLock;
 use stop_words::{Language, get};
 
+const TRAILING_PUNCTUATION_REGEX_: &str = r"\w+|[[:punct:]]+";
 const TRAILING_PUNCTUATION_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\w+|[^\w\s]").unwrap());
-const EMAIL_REGEX: &str = r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
+    LazyLock::new(|| Regex::new(TRAILING_PUNCTUATION_REGEX_).unwrap());
+const EMAIL_REGEX: &str = r"[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
 const EMOTICON_REGEX: &str = r"[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)";
 
 static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     {
         Regex::new(
             format!(
-                r"({})|({})|([a-zA-Z0-9\s!?$%'])|.",
-                EMAIL_REGEX, EMOTICON_REGEX
+                r"({})|({})|({})|([a-zA-Z0-9\s!?$%'])|(.)",
+                EMAIL_REGEX, EMOTICON_REGEX, TRAILING_PUNCTUATION_REGEX_
             )
             .as_str(),
         )
     }
     .unwrap()
 });
+
+const STOP_WORDS: LazyLock<HashSet<&str>> =
+    LazyLock::new(|| get(Language::English).iter().map(|s| *s).collect());
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
@@ -68,12 +72,11 @@ impl Classifier {
     }
 
     fn preprocess_text(text: &str) -> String {
-        let stop_words: HashSet<&str> = get(Language::English).iter().map(|s| *s).collect();
-
         // Remove stop words
-        let without_stop_words = text
-            .split_whitespace()
-            .filter(|w| !stop_words.contains(w.to_lowercase().as_str()))
+        let without_stop_words = Self::tokenise(text)
+            .into_iter()
+            .filter(|w| !STOP_WORDS.contains(w.to_lowercase().as_str()))
+            .map(|w| w.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
 
@@ -91,8 +94,8 @@ impl Classifier {
     }
 
     pub fn predict(&self, text: &str) -> bool {
-        let processed = Self::preprocess_text(text);
-        let tokens = Self::tokenise(&processed);
+        let preprocessed = Self::preprocess_text(text);
+        let tokens: Vec<&str> = preprocessed.split_whitespace().collect();
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
         for token in tokens {
@@ -113,31 +116,25 @@ impl Classifier {
                 .ln();
         }
 
-        // Normalisation using log-sum-exp
-        let max = if positive_probability > negative_probability {
-            positive_probability
-        } else {
-            negative_probability
-        };
-
-        // Use log-sum-exp to calculate sum of the logarithms of our posteriors
-        let log_probability_sum =
-            max + ((positive_probability - max).exp() + (negative_probability - max).exp()).ln();
-
-        let positive_probability_normalised = (positive_probability - log_probability_sum).exp();
-        let negative_probability_normalised = (negative_probability - log_probability_sum).exp();
-        positive_probability_normalised > negative_probability_normalised
+        // Normalisation via logistic sigmoid
+        let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
+        p > 0.5
     }
 
     // Split text into tokens including stripping trailing punctuation as their own token
     // i.e hello! becomes "hello", "!"
-    fn tokenise(text: &str) -> Vec<&str> {
-        let tokens: Vec<&str> = TRAILING_PUNCTUATION_REGEX
+    fn tokenise(text: &str) -> Vec<String> {
+        let t: Vec<&str> = TRAILING_PUNCTUATION_REGEX
             .find_iter(text)
             .map(|s| s.as_str())
             .collect::<Vec<&str>>();
+
+        let tokens = t.iter().map(|t| t.to_string()).collect::<Vec<String>>();
+        // let bigrams = t
+        //     .windows(2)
+        //     .map(|w| format!("{}_{}", w[0], w[1]))
+        //     .collect::<Vec<String>>();
         return tokens;
-        // let bigrams = tokens.windows(2).map(|w| (w[0], w[1])).collect();
-        // return bigrams;
+        // return [tokens].concat();
     }
 }

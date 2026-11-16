@@ -22,7 +22,7 @@ pub struct Classifier {
     negative_unseen_likelihood: f64,
 }
 
-const TRAILING_PUNCTUATION_REGEX_: &str = r"\w+|[^\w\s]";
+const TRAILING_PUNCTUATION_REGEX_: &str = r"\w+|[[:punct:]]+";
 const TRAILING_PUNCTUATION_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(TRAILING_PUNCTUATION_REGEX_).unwrap());
 const EMAIL_REGEX: &str = r"[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
@@ -40,6 +40,9 @@ static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     }
     .unwrap()
 });
+
+const STOP_WORDS: LazyLock<HashSet<&str>> =
+    LazyLock::new(|| get(Language::English).iter().map(|s| *s).collect());
 
 impl Classifier {
     pub fn new(alpha: f64) -> Self {
@@ -229,12 +232,11 @@ impl Classifier {
     }
 
     fn preprocess_text(text: &str) -> String {
-        let stop_words: HashSet<&str> = get(Language::English).iter().map(|s| *s).collect();
-
         // Remove stop words
-        let without_stop_words = text
-            .split_whitespace()
-            .filter(|w| !stop_words.contains(w.to_lowercase().as_str()))
+        let without_stop_words = Self::tokenise(text)
+            .into_iter()
+            .filter(|w| !STOP_WORDS.contains(w.to_lowercase().as_str()))
+            .map(|w| w.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
 
@@ -272,8 +274,7 @@ impl Classifier {
     }
 
     pub fn predict(&self, text: &str) -> bool {
-        let processed = Self::preprocess_text(text);
-        let tokens = Self::tokenise(&processed);
+        let tokens = Self::preprocess_text(text).split_whitespace().into_vec();
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
         for token in tokens {

@@ -5,10 +5,10 @@ use std::{error::Error, path::PathBuf};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let _ = nuance_test(5.0, false);
-    // let _ = cross_validation(0.55);
+    // let _ = nuance_test(1.0, false);
+    // let _ = cross_validation(1.0);
 
-    // let _ = train_and_save();
+    let _ = train_and_save();
     // let _ = single_test(true);
     Ok(())
 }
@@ -18,7 +18,7 @@ fn train_and_save() -> Result<(), Box<dyn Error>> {
     let label_column = "label";
     let positive_label = "1";
     let negative_label = "0";
-    let mut classifier = Classifier::new(0.55);
+    let mut classifier = Classifier::new(1.0);
     let corpus = classifier.parse_csv(
         "trainer/src/data/Ling.csv",
         content_column,
@@ -247,6 +247,7 @@ fn cross_validation(alpha: f64) -> Result<(), Box<dyn Error>> {
         let mut reader = Reader::from_path(test_path)?;
         let headers = reader.headers().unwrap();
         let find_column_position = |s: &str| headers.iter().position(|c| c == s);
+
         let content_column_position = find_column_position(content_column).unwrap();
         let label_column_position = find_column_position(label_column).unwrap();
 

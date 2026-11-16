@@ -1,4 +1,4 @@
-import init, { load_classifier, predict } from "./public/pkg/spam_or_ham.js";
+import init, { load_classifier, predict } from "./public/wasm.js";
 
 let loaded = false;
 
@@ -7,8 +7,7 @@ init().then(async () => {
   let model_as_text = await res.text();
   console.log("model", model_as_text)
   loaded = load_classifier(model_as_text)
-  let text = loaded ? "yay" : "nay"
-  document.getElementById("name")!.innerText = text
+  console.log(loaded)
 })
 
 let spamHeader = document.getElementById("spam-header")!;
