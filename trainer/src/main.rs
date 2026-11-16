@@ -5,10 +5,11 @@ use std::{error::Error, path::PathBuf};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // let _ = nuance_test(0.55);
+    let _ = nuance_test(5.0, false);
     // let _ = cross_validation(0.55);
-    // let _ = single_test(false);
-    let _ = train_and_save();
+
+    // let _ = train_and_save();
+    // let _ = single_test(true);
     Ok(())
 }
 
@@ -45,15 +46,19 @@ fn find_ideal_alpha_nuance_test() {
     for i in 0..candidates.len() {
         let alpha = *candidates.get(i).unwrap();
         println!("TESTING α = {}", alpha);
-        let _ = nuance_test(alpha);
+        let _ = nuance_test(alpha, false);
         println!("");
     }
 }
 
-fn nuance_test(alpha: f64) -> Result<(), Box<dyn Error>> {
+fn nuance_test(alpha: f64, pretrained: bool) -> Result<(), Box<dyn Error>> {
     let mut classifier = Classifier::new(alpha);
     let corpus = classifier.parse_csv("trainer/src/data/Ling.csv", "body", "label", "1", "0")?;
-    let _ = classifier.train(corpus)?;
+    if pretrained {
+        let _ = classifier.load_pretrained("model.json");
+    } else {
+        let _ = classifier.train(corpus).expect("Failed training");
+    }
 
     let spam_messages = [
         "CONGRATULATIONS!!! You are the LUCKY WINNER of $1,000,000 CASH!!! CLICK HERE NOW!!! 100% FREE!!! NO CATCH!!! LIMITED TIME ONLY!!! ACT NOW!!! BUY NOW!!!",
@@ -98,8 +103,8 @@ fn nuance_test(alpha: f64) -> Result<(), Box<dyn Error>> {
     for i in 0..non_spam_messages.len() {
         print!("MESSAGE {}: ", i + 1);
         outcome = classifier.predict(non_spam_messages.get(i).unwrap());
-        println!("{}", if outcome { "PASSED" } else { "FAILED" });
-        if outcome {
+        println!("{}", if !outcome { "PASSED" } else { "FAILED" });
+        if !outcome {
             correct += 1;
         }
     }

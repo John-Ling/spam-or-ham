@@ -22,17 +22,18 @@ pub struct Classifier {
     negative_unseen_likelihood: f64,
 }
 
+const TRAILING_PUNCTUATION_REGEX_: &str = r"\w+|[^\w\s]";
 const TRAILING_PUNCTUATION_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\w+|[^\w\s]").unwrap());
-const EMAIL_REGEX: &str = r"[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
+    LazyLock::new(|| Regex::new(TRAILING_PUNCTUATION_REGEX_).unwrap());
+const EMAIL_REGEX: &str = r"[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
 const EMOTICON_REGEX: &str = r"[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)";
 
 static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     {
         Regex::new(
             format!(
-                r"({})|({})|([a-zA-Z0-9\s!?$%'])|.",
-                EMAIL_REGEX, EMOTICON_REGEX
+                r"({})|({})|({})|([a-zA-Z0-9\s!?$%'])|(.)",
+                EMAIL_REGEX, EMOTICON_REGEX, TRAILING_PUNCTUATION_REGEX_
             )
             .as_str(),
         )
@@ -96,24 +97,6 @@ impl Classifier {
         Ok(())
     }
 
-    pub fn load_pretrained_from_string(
-        &mut self,
-        model_string: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        let model = serde_json::from_str::<Classifier>(model_string)?;
-        self.alpha = model.alpha;
-        self.content_column = model.content_column;
-        self.label_column = model.label_column;
-        self.negative_label = model.negative_label;
-        self.positive_label = model.positive_label;
-        self.positive_probability = model.positive_probability;
-        self.positive_likelihoods = model.positive_likelihoods;
-        self.positive_unseen_likelihood = model.positive_unseen_likelihood;
-        self.negative_likelihoods = model.negative_likelihoods;
-        self.negative_unseen_likelihood = model.negative_unseen_likelihood;
-        Ok(())
-    }
-
     pub fn train(&mut self, corpus: DataFrame) -> Result<(), Box<dyn Error>> {
         let processed = self.preprocess_corpus(corpus)?;
         let label_column = &self.label_column;
@@ -137,7 +120,8 @@ impl Classifier {
                     .len()
                     .alias("negative_count"),
             ])
-            .collect()?;
+            .collect()
+            .expect("Failed to count positive and negative records");
 
         let total_positive_records = positive_negative_record_counts
             .column("positive_count")?
@@ -182,6 +166,7 @@ impl Classifier {
                     .cast(DataType::Float64)
                     .alias("negative_counts"),
             ])
+            .filter((col("positive_counts") + col("negative_counts")).gt_eq(lit(5.0)))
             .collect()?;
 
         let unique_word_count = per_word_counts.column("tokens")?.len() as f64;
@@ -310,21 +295,9 @@ impl Classifier {
                 .ln();
         }
 
-        // Normalisation using log-sum-exp
-        let max = if positive_probability > negative_probability {
-            positive_probability
-        } else {
-            negative_probability
-        };
-
-        // Use log-sum-exp to calculate sum of the logarithms of our posteriors
-        let log_probability_sum =
-            max + ((positive_probability - max).exp() + (negative_probability - max).exp()).ln();
-
-        let positive_probability_normalised = (positive_probability - log_probability_sum).exp();
-        let negative_probability_normalised = (negative_probability - log_probability_sum).exp();
-
-        positive_probability_normalised > negative_probability_normalised
+        // Normalisation via logistic sigmoid
+        let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
+        p > 0.5
     }
 
     // Split text into tokens including stripping trailing punctuation as their own token
