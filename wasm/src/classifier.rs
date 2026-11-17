@@ -118,7 +118,7 @@ impl Classifier {
 
         // Normalisation via logistic sigmoid
         let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        p > 0.5
+        p > 0.99
     }
 
     // Split text into tokens including stripping trailing punctuation as their own token

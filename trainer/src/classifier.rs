@@ -146,7 +146,7 @@ impl Classifier {
                 col(label_column).cast(DataType::String),
                 col(content_column)
                     .str()
-                    .extract_all(lit(r"\w+|[^\w\s]"))
+                    .extract_all(lit(r"\S+"))
                     .alias("tokens"),
             ])
             .explode(
@@ -216,6 +216,39 @@ impl Classifier {
         Ok(())
     }
 
+    pub fn predict(&self, text: &str) -> bool {
+        let tokens = Self::preprocess_text(text).split_whitespace().into_vec();
+        println!("{:#?} ", tokens);
+        let mut positive_probability = self.positive_probability.ln();
+        let mut negative_probability = (1.0 - self.positive_probability).ln();
+        for token in tokens {
+            let token = token.as_str();
+            let lp = self.positive_likelihoods.get(token);
+            let ln = self.negative_likelihoods.get(token);
+
+            // Skip words that appear in neither class
+            if ln.is_none() && lp.is_none() {
+                println!("{} in neither class", token);
+                continue;
+            }
+
+            let likelihood_positive = lp.unwrap_or(&self.positive_unseen_likelihood);
+            let likelihood_negative = ln.unwrap_or(&self.negative_unseen_likelihood);
+
+            println!(
+                "Token {}\npositive: {}\nnegative: {}",
+                token, likelihood_positive, likelihood_negative
+            );
+
+            positive_probability += likelihood_positive.ln();
+            negative_probability += likelihood_negative.ln();
+        }
+
+        // Normalisation via logistic sigmoid
+        let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
+        p > 0.999 // TODO: lwk just kind of guessed the threshold value should find this value via cross validation but idgaf
+    }
+
     fn preprocess_corpus(&self, corpus: DataFrame) -> Result<DataFrame, Box<dyn Error>> {
         let content_column = self.content_column.as_str();
         let processed_corpus = corpus.lazy().with_columns([col(content_column).map(
@@ -250,7 +283,10 @@ impl Classifier {
                     " ".to_string()
                 }
             })
-            .into_owned()
+            .into_owned();
+
+        println!("Preprocessed {} ", without_stop_words);
+        without_stop_words
     }
 
     pub fn parse_csv(
@@ -272,35 +308,6 @@ impl Classifier {
         self.negative_label = negative_label.to_string();
         Ok(df)
     }
-
-    pub fn predict(&self, text: &str) -> bool {
-        let tokens = Self::preprocess_text(text).split_whitespace().into_vec();
-        let mut positive_probability = self.positive_probability.ln();
-        let mut negative_probability = (1.0 - self.positive_probability).ln();
-        for token in tokens {
-            let token = token.as_str();
-            let likelihood_positive = self.positive_likelihoods.get(token);
-            let likelihood_negative = self.negative_likelihoods.get(token);
-
-            // Skip words that appear in neither class
-            if likelihood_negative.is_none() && likelihood_positive.is_none() {
-                continue;
-            }
-
-            positive_probability += likelihood_positive
-                .unwrap_or(&self.positive_unseen_likelihood)
-                .ln();
-
-            negative_probability += likelihood_negative
-                .unwrap_or(&self.negative_unseen_likelihood)
-                .ln();
-        }
-
-        // Normalisation via logistic sigmoid
-        let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        p > 0.5
-    }
-
     // Split text into tokens including stripping trailing punctuation as their own token
     // i.e hello! becomes "hello", "!"
     fn tokenise(text: &str) -> Vec<String> {

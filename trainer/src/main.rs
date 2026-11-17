@@ -8,8 +8,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let _ = nuance_test(1.0, false);
     // let _ = cross_validation(1.0);
 
-    let _ = train_and_save();
+    // let _ = train_and_save();
+    let _ = nuance_test(1.0, true);
     // let _ = single_test(true);
+
     Ok(())
 }
 
@@ -87,17 +89,56 @@ fn nuance_test(alpha: f64, pretrained: bool) -> Result<(), Box<dyn Error>> {
 
     println!("RUNNING NON-SPAM NUANCE TEST");
     let non_spam_messages = [
-        "Want to grab lunch at the new place around the corner? I was thinking 12:30. Let me know and I will book a table (^_^)",
-        "Hey everyone, I uploaded my notes from today's lecture on conditional probability and Bayes' theorem. The practice problems on page 4 are tricky, so let's go through them on Thursday.",
-        "Hi love, are you free for dinner on Sunday? Dad is making his famous lasagna and the kids would love to see you. Let me know if you can bring dessert. Mum x",
-        "Jordan requested your review on “Fix tokenizer edge case”. The changes add handling for empty strings and include two new unit tests. Please take a look when you have a moment.",
-        "Hi team, the testing phase is complete and we found three bugs, all now fixed. Next week we will start the deployment checklist. Please review the document and send comments by Wednesday.",
-        "Hey, something has come up and I need to reschedule our 2pm catch-up. Would Friday morning work instead? Happy to do a quick call if that is easier. Thanks! :)",
-        "Hi Priya, please find the invoice for September attached. Payment is due within 14 days. Let me know if you need any changes to the details. Cheers, Marcus",
-        "Thanks for your recent purchase! As a returning customer, you get free shipping on orders over $50 for the next 30 days. This offer applies to your account only and expires on 30 November.",
-        "Your October account statement is now available. Please log in to your online banking portal to view it. If you have any questions about a transaction, call the number on the back of your card.",
-        "Hi Sam, good news: your order #48213 has shipped and should arrive within 3-5 business days. You can track your parcel using the tracking number below. Thanks for shopping with us!",
-    ];
+            "Want to grab lunch at the new place around the corner? I was thinking 12:30. Let me know and I will book a table (^_^)",
+            "Hey everyone, I uploaded my notes from today's lecture on conditional probability and Bayes' theorem. The practice problems on page 4 are tricky, so let's go through them on Thursday.",
+            "Hi love, are you free for dinner on Sunday? Dad is making his famous lasagna and the kids would love to see you. Let me know if you can bring dessert. Mum x",
+            "Jordan requested your review on “Fix tokenizer edge case”. The changes add handling for empty strings and include two new unit tests. Please take a look when you have a moment.",
+            "Dear Julie,
+
+    Thank you for taking the time to sort out handover details and for the opportunity for us to demo the project's latest build.
+
+    The handover document is attached. Email us if you have any questions or suggestions for changes.
+
+    After reading if you're confident with proceeding to the handover, provide a date and an email associated with a GitHub account and we'll happily transfer the repository over as well as necessary secrets as outlined.
+
+    Many thanks,
+    Campbell Jackson. ",
+            "Hi Julie, hope you are doing well.
+
+    I'm Peter, the Scrum Master of Team Google3, working on MediMate. Campbell, our Product Owner, usually handles our communication with you, but I'm stepping in to help organise the handover.
+
+    We're nearly finished building MediMate and would like to hand it over to Medical Pantry.
+
+    We suggest doing the handover by email, with:
+
+        A single handover document
+        A recorded video demo of the app
+    Could you let us know by 04/11/2026? Our deadline is 12 November, so we'd like to start as soon as we can. Any passwords or keys will be sent to you separately.
+
+    Thanks so much for working with us on this.
+
+    Kind regards,
+
+    Peter Huang
+    Scrum Master, Team Google3
+
+    COMP30022 IT Project, University of Melbourne",
+    "Hi Peter,
+
+    Thanks for the detailed message.
+
+    Let's schedule a meeting as well as have the handover by email.
+
+    Do you have time tomorrow at 12pm for the handover?
+
+    Thank you, ",
+            "Hi team, the testing phase is complete and we found three bugs, all now fixed. Next week we will start the deployment checklist. Please review the document and send comments by Wednesday.",
+            "Hey, something has come up and I need to reschedule our 2pm catch-up. Would Friday morning work instead? Happy to do a quick call if that is easier. Thanks! :)",
+            "Hi Priya, please find the invoice for September attached. Payment is due within 14 days. Let me know if you need any changes to the details. Cheers, Marcus",
+            "Thanks for your recent purchase! As a returning customer, you get free shipping on orders over $50 for the next 30 days. This offer applies to your account only and expires on 30 November.",
+            "Your October account statement is now available. Please log in to your online banking portal to view it. If you have any questions about a transaction, call the number on the back of your card.",
+            "Hi Sam, good news: your order #48213 has shipped and should arrive within 3-5 business days. You can track your parcel using the tracking number below. Thanks for shopping with us!",
+        ];
 
     correct = 0;
     for i in 0..non_spam_messages.len() {
