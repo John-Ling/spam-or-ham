@@ -1,12 +1,11 @@
 use polars::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::LazyLock;
-use stop_words::{Language, get};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
@@ -40,9 +39,6 @@ static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     }
     .unwrap()
 });
-
-const STOP_WORDS: LazyLock<HashSet<&str>> =
-    LazyLock::new(|| get(Language::English).iter().map(|s| *s).collect());
 
 impl Classifier {
     pub fn new(alpha: f64) -> Self {
@@ -218,7 +214,6 @@ impl Classifier {
 
     pub fn predict(&self, text: &str) -> bool {
         let tokens = Self::preprocess_text(text).split_whitespace().into_vec();
-        println!("{:#?} ", tokens);
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
         for token in tokens {
@@ -228,17 +223,11 @@ impl Classifier {
 
             // Skip words that appear in neither class
             if ln.is_none() && lp.is_none() {
-                println!("{} in neither class", token);
                 continue;
             }
 
             let likelihood_positive = lp.unwrap_or(&self.positive_unseen_likelihood);
             let likelihood_negative = ln.unwrap_or(&self.negative_unseen_likelihood);
-
-            println!(
-                "Token {}\npositive: {}\nnegative: {}",
-                token, likelihood_positive, likelihood_negative
-            );
 
             positive_probability += likelihood_positive.ln();
             negative_probability += likelihood_negative.ln();
@@ -246,7 +235,7 @@ impl Classifier {
 
         // Normalisation via logistic sigmoid
         let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        p > 0.99 // TODO: lwk just kind of guessed the threshold value should find this value via cross validation but idgaf
+        p > 0.995 // TODO: lwk just kind of guessed the threshold value should find this value via cross validation but idgaf
     }
 
     fn preprocess_corpus(&self, corpus: DataFrame) -> Result<DataFrame, Box<dyn Error>> {
@@ -266,9 +255,8 @@ impl Classifier {
 
     fn preprocess_text(text: &str) -> String {
         // Remove stop words
-        let without_stop_words = Self::tokenise(text)
+        let processed = Self::tokenise(text)
             .into_iter()
-            .filter(|w| !STOP_WORDS.contains(w.to_lowercase().as_str()))
             .map(|w| w.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
@@ -276,7 +264,7 @@ impl Classifier {
         // Remove all other characters not in the KEEP_REGEX
         // KEEP_REGEX also keeps emails and emoticons that otherwise would have been stripped
         KEEP_REGEX
-            .replace_all(&without_stop_words, |caps: &regex::Captures| {
+            .replace_all(&processed, |caps: &regex::Captures| {
                 if caps.get(4).is_none() {
                     caps[0].to_string()
                 } else {
@@ -285,8 +273,7 @@ impl Classifier {
             })
             .into_owned();
 
-        println!("Preprocessed {} ", without_stop_words);
-        without_stop_words
+        processed
     }
 
     pub fn parse_csv(

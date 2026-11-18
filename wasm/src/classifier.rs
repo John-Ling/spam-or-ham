@@ -1,9 +1,8 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::LazyLock;
-use stop_words::{Language, get};
 
 const TRAILING_PUNCTUATION_REGEX_: &str = r"\w+|[[:punct:]]+";
 const TRAILING_PUNCTUATION_REGEX: LazyLock<Regex> =
@@ -23,9 +22,6 @@ static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     }
     .unwrap()
 });
-
-const STOP_WORDS: LazyLock<HashSet<&str>> =
-    LazyLock::new(|| get(Language::English).iter().map(|s| *s).collect());
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Classifier {
@@ -73,9 +69,8 @@ impl Classifier {
 
     fn preprocess_text(text: &str) -> String {
         // Remove stop words
-        let without_stop_words = Self::tokenise(text)
+        let processed = Self::tokenise(text)
             .into_iter()
-            .filter(|w| !STOP_WORDS.contains(w.to_lowercase().as_str()))
             .map(|w| w.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
@@ -83,7 +78,7 @@ impl Classifier {
         // Remove all other characters not in the KEEP_REGEX
         // KEEP_REGEX also keeps emails and emoticons that otherwise would have been stripped
         KEEP_REGEX
-            .replace_all(&without_stop_words, |caps: &regex::Captures| {
+            .replace_all(&processed, |caps: &regex::Captures| {
                 if caps.get(4).is_none() {
                     caps[0].to_string()
                 } else {
@@ -122,7 +117,7 @@ impl Classifier {
 
         // Normalisation via logistic sigmoid
         let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        Ok((p > 0.99, probabilities))
+        Ok((p > 0.995, probabilities))
     }
 
     // Split text into tokens including stripping trailing punctuation as their own token
