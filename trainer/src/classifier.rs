@@ -246,7 +246,7 @@ impl Classifier {
 
         // Normalisation via logistic sigmoid
         let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        p > 0.999 // TODO: lwk just kind of guessed the threshold value should find this value via cross validation but idgaf
+        p > 0.99 // TODO: lwk just kind of guessed the threshold value should find this value via cross validation but idgaf
     }
 
     fn preprocess_corpus(&self, corpus: DataFrame) -> Result<DataFrame, Box<dyn Error>> {

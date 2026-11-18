@@ -93,32 +93,36 @@ impl Classifier {
             .into_owned()
     }
 
-    pub fn predict(&self, text: &str) -> bool {
+    pub fn predict(&self, text: &str) -> Result<(bool, Vec<(f64, f64)>), Box<dyn Error>> {
         let preprocessed = Self::preprocess_text(text);
         let tokens: Vec<&str> = preprocessed.split_whitespace().collect();
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
-        for token in tokens {
-            let likelihood_positive = self.positive_likelihoods.get(token);
-            let likelihood_negative = self.negative_likelihoods.get(token);
+
+        let mut probabilities = vec![(0.0, 0.0); tokens.len()];
+        for (i, t) in tokens.iter().enumerate() {
+            let token = *t;
+            let lp = self.positive_likelihoods.get(token);
+            let ln = self.negative_likelihoods.get(token);
 
             // Skip words that appear in neither class
-            if likelihood_negative.is_none() && likelihood_positive.is_none() {
+            if ln.is_none() && lp.is_none() {
                 continue;
             }
 
-            positive_probability += likelihood_positive
-                .unwrap_or(&self.positive_unseen_likelihood)
-                .ln();
+            let likelihood_positive = lp.unwrap_or(&self.positive_unseen_likelihood);
+            let likelihood_negative = ln.unwrap_or(&self.negative_unseen_likelihood);
 
-            negative_probability += likelihood_negative
-                .unwrap_or(&self.negative_unseen_likelihood)
-                .ln();
+            probabilities[i] = (likelihood_positive.clone(), likelihood_negative.clone());
+
+            // Multiplying small probabilities can lead to underflow hence convert to log scale to and sum instead
+            positive_probability += likelihood_positive.ln();
+            negative_probability += likelihood_negative.ln();
         }
 
         // Normalisation via logistic sigmoid
         let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        p > 0.99
+        Ok((p > 0.99, probabilities))
     }
 
     // Split text into tokens including stripping trailing punctuation as their own token

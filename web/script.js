@@ -16,7 +16,7 @@ document.getElementById("input-field")?.addEventListener("input", (e) => {
         hamHeader.classList = "";
         return;
     }
-    let isSpam = predict(inputContent);
+    let { outcome: isSpam, positive_probabilities, negative_probabilities } = predict(inputContent);
     spamHeader.classList = isSpam ? "lift" : "sink";
     hamHeader.classList = isSpam ? "sink" : "lift";
 });
