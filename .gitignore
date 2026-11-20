@@ -1,4 +1,4 @@
 /target
 /trainer/src/data
-*.json
+model.json
 /web/node_modules

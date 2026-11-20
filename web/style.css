@@ -22,6 +22,10 @@
     --foreground: #ead22f;
 }
 
+.prose {
+    font-family: "Inter";
+}
+
 #app {
     display: flex;
     height: 100dvh;
@@ -65,17 +69,65 @@
 
 #ham-header {
     transition: translate 0.2s cubic-bezier(0.24, 1.19, 0.8, 0.96);
-
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: none;
 }
 
 #spam-header {
     transition: translate 0.2s cubic-bezier(0.24, 1.19, 0.8, 0.96);
+    -webkit-user-select: none;
+    user-select: none;
+    pointer-events: none;
 }
 
 #description {
     font-family: "Inter";
     flex-basis: 30%;
 }
+
+.token {
+    position: relative;
+    transition: none !important;
+    animation: none !important;
+    font-family: "Inter";
+    color: var(--foreground);
+}
+
+.token::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    overflow-wrap: normal;
+    width: 19rem;
+    background: rgb(from var(--foreground) r g b / 0.2);
+    border: solid 1px var(--foreground);
+    margin-bottom: 10px;
+    transition: opacity 0.15s;
+    z-index: 10;
+}
+
+.token:hover::after,
+.token:focus-visible::after {
+    opacity: 1;
+}
+
+.token:active {
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+
+
+.highlight-yellow {
+    background: rgb(from var(--foreground) r g b / 0.3);
+    border: solid 1px var(--foreground);
+}
+
 
 .lift {
     translate: 0 -70px;
@@ -92,10 +144,13 @@
     border: var(--foreground);
     font-family: "Inter";
     resize: none;
+    white-space: pre-wrap;
     /* width: 40%; */
     width: clamp(14rem, 80vw, 30rem);
+    overflow-wrap: anywhere;
     height: 24rem;
     padding: 0.25rem;
+    z-index: 0;
 }
 
 #input-field:focus {

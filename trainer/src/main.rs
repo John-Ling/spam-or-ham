@@ -8,9 +8,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let _ = nuance_test(1.0, false);
     // let _ = cross_validation(1.0);
 
-    let _ = train_and_save().expect("Failed to train");
+    // let _ = train_and_save().expect("Failed to train");
     let _ = nuance_test(1.0, true).expect("Nuance test failed: ");
-    let _ = single_test(true).expect("Single test failed: ");
+    // let _ = single_test(true).expect("Single test failed: ");
 
     Ok(())
 }

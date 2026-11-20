@@ -229,6 +229,8 @@ impl Classifier {
             let likelihood_positive = lp.unwrap_or(&self.positive_unseen_likelihood);
             let likelihood_negative = ln.unwrap_or(&self.negative_unseen_likelihood);
 
+            println!("{} {} ", likelihood_positive, likelihood_negative);
+
             positive_probability += likelihood_positive.ln();
             negative_probability += likelihood_negative.ln();
         }
@@ -271,9 +273,7 @@ impl Classifier {
                     " ".to_string()
                 }
             })
-            .into_owned();
-
-        processed
+            .into_owned()
     }
 
     pub fn parse_csv(

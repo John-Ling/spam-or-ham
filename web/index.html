@@ -17,8 +17,11 @@
     </div>
 
     <div id="app-body">
-      <textarea spellcheck="false" id="input-field"></textarea>
-      <p id="description">Naive Bayes classifiers are a form of probabilistic classifiers, that is they use simple
+      <div>
+        <div id="input-field" contenteditable="plaintext-only" spellcheck="false"></div>
+        <p class="prose">Trained on English texts - other languages won't yield accurate predictions.</p>
+      </div>
+      <p class="prose">Naive Bayes classifiers are a form of probabilistic classifiers, that is they use simple
         probability perform classification tasks incredibly quickly. The textbook use of a multinomial NB classifier is
         determining whether an incoming message is <span>spam</span> or not spam (aka <span>ham</span>).
         This project is the only thing keeping me sane during my exams.</p>

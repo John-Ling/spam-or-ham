@@ -37,7 +37,6 @@ impl PredictionResult {
 
 #[wasm_bindgen]
 pub fn predict(string: &str) -> PredictionResult {
-    web_sys::console::log_2(&"{}".into(), &JsValue::from_str(string));
     let classifier = CLASSIFIER_INSTANCE.get().unwrap();
     let (outcome, probabilities) = classifier.predict(string).unwrap();
 
