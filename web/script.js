@@ -1,6 +1,5 @@
 import init, { load_classifier, predict } from "./public/wasm.js";
 let loaded = false;
-let inputFieldBuffer = "";
 await init();
 let res = await fetch("/model.json");
 loaded = load_classifier(await res.text());
@@ -9,17 +8,16 @@ let hamHeader = document.getElementById("ham-header");
 document.getElementById("input-field")?.addEventListener("input", (e) => {
     let inputField = e.target;
     let content = inputField.innerText;
-    inputFieldBuffer = content;
-    if (inputFieldBuffer.trim() === "") {
+    if (content.trim() === "") {
         spamHeader.classList = "";
         hamHeader.classList = "";
         inputField.innerHTML = "";
         return;
     }
-    let { outcome: isSpam, positive_probabilities, negative_probabilities } = predict(inputFieldBuffer);
+    let { outcome: isSpam, positive_probabilities, negative_probabilities } = predict(content);
     spamHeader.classList = isSpam ? "lift" : "sink";
     hamHeader.classList = isSpam ? "sink" : "lift";
-    updateTokenProbabilitiesUI(inputField, positive_probabilities, negative_probabilities);
+    updateTokenProbabilitiesUI(content, inputField, positive_probabilities, negative_probabilities);
 });
 const preprocessText = (text) => {
     const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu;
@@ -32,21 +30,14 @@ const preprocessText = (text) => {
     });
     return result;
 };
-const updateTokenProbabilitiesUI = (inputField, positive_probabilities, negative_probabilities) => {
+const updateTokenProbabilitiesUI = (content, inputField, positive_probabilities, negative_probabilities) => {
     const caretOffset = getCaretOffset(inputField);
-    let t = preprocessText(inputFieldBuffer);
-    const tokens = inputFieldBuffer.match(/\w+|\p{P}+|\s+/gu) ?? [];
+    let t = preprocessText(content);
+    const tokens = content.match(/\w+|[\p{P}\p{S}]+|\s+/gu) ?? [];
     let processed_tokens = t.split(/\s+/) ?? [];
-    console.log(positive_probabilities);
-    console.log(tokens.length, processed_tokens.length, positive_probabilities.length);
     let output = "";
     let counter = 0;
     for (const token of tokens) {
-        const newlineCount = (token.match(/\r\n|\n/g) ?? []).length;
-        if (newlineCount > 0) {
-            output += "<br>".repeat(newlineCount);
-            continue;
-        }
         if (/\s+/.test(token)) {
             output += token;
             continue;
@@ -54,12 +45,12 @@ const updateTokenProbabilitiesUI = (inputField, positive_probabilities, negative
         if (processed_tokens.includes(token)) {
             console.log(positive_probabilities[counter]);
             console.log(negative_probabilities[counter]);
-            output += `<button class="token highlight-yellow" data-tip="Positive: ${parseFloat(positive_probabilities[counter].toFixed(6))} Negative: ${parseFloat(negative_probabilities[counter].toFixed(6))}"
+            output += `<button class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter].toFixed(6))} / NEGATIVE: ${parseFloat(negative_probabilities[counter].toFixed(6))}"
 >${token}</button>`;
             counter += 1;
             continue;
         }
-        output += `<button class="token highlight-yellow">${token}</button>`;
+        output += `<button class="token highlight-red">${token}</button>`;
     }
     inputField.innerHTML = output;
     moveCaretToOffset(inputField, caretOffset);

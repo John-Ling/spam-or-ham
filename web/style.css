@@ -20,6 +20,7 @@
     --shadow: #c727a0;
     --card: #E122B6;
     --foreground: #ead22f;
+    --red: #5fa4fb;
 }
 
 .prose {
@@ -87,14 +88,17 @@
 }
 
 .token {
-    position: relative;
     transition: none !important;
     animation: none !important;
     font-family: "Inter";
     color: var(--foreground);
 }
 
-.token::after {
+.has-tooltip {
+    position: relative;
+}
+
+.has-tooltip::after {
     content: attr(data-tip);
     position: absolute;
     bottom: 100%;
@@ -103,15 +107,17 @@
     opacity: 0;
     overflow-wrap: normal;
     width: 19rem;
-    background: rgb(from var(--foreground) r g b / 0.2);
+    color: var(--background);
+    /* background: rgb(from var(--foreground) r g b / 0.2); */
+    background: var(--foreground);
     border: solid 1px var(--foreground);
     margin-bottom: 10px;
-    transition: opacity 0.15s;
+    transition: opacity 0.1s;
     z-index: 10;
 }
 
-.token:hover::after,
-.token:focus-visible::after {
+.has-tooltip:hover::after,
+.has-tooltip:focus-visible::after {
     opacity: 1;
 }
 
@@ -122,10 +128,15 @@
 }
 
 
-
 .highlight-yellow {
     background: rgb(from var(--foreground) r g b / 0.3);
     border: solid 1px var(--foreground);
+}
+
+.highlight-red {
+    background: rgb(from var(--red) r g b / 0.3);
+    border: solid 1px var(--red);
+    color: var(--red);
 }
 
 
