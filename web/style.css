@@ -159,9 +159,15 @@
     /* width: 40%; */
     width: clamp(14rem, 80vw, 30rem);
     overflow-wrap: anywhere;
+    /* scrollbar-width: none; */
+    /* overflow-x: auto; */
     height: 24rem;
     padding: 0.25rem;
     z-index: 0;
+}
+
+#input-field::-webkit-scrollbar {
+    display: none;
 }
 
 #input-field:focus {

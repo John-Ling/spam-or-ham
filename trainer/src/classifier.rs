@@ -25,7 +25,10 @@ const EMAIL_REGEX: &str = r"[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0
 const EMOTICON_REGEX: &str = r"[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)";
 
 static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(&format!(r"{EMAIL_REGEX}|{EMOTICON_REGEX}|\w+|[[:punct:]]+")).unwrap()
+    Regex::new(&format!(
+        r"{EMAIL_REGEX}|{EMOTICON_REGEX}|\w+|[\p{{P}}\p{{S}}]"
+    ))
+    .unwrap()
 });
 
 impl Classifier {
