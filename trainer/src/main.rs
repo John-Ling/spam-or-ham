@@ -8,19 +8,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     // let _ = nuance_test(1.0, false);
     // let _ = cross_validation(1.0);
 
-    // let _ = train_and_save().expect("Failed to train");
-    let _ = nuance_test(1.0, true).expect("Nuance test failed: ");
-    // let _ = single_test(true).expect("Single test failed: ");
+    let _ = train_and_save(7.0).expect("Failed to train");
+    let _ = nuance_test(7.0, true).expect("Nuance test failed: ");
+    let _ = single_test(true).expect("Single test failed: ");
 
     Ok(())
 }
 
-fn train_and_save() -> Result<(), Box<dyn Error>> {
+fn train_and_save(alpha: f64) -> Result<(), Box<dyn Error>> {
     let content_column = "body";
     let label_column = "label";
     let positive_label = "1";
     let negative_label = "0";
-    let mut classifier = Classifier::new(1.0);
+    let mut classifier = Classifier::new(alpha);
     let corpus = classifier.parse_csv(
         "trainer/src/data/Ling.csv",
         content_column,

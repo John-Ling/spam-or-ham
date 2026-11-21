@@ -31,25 +31,22 @@ const preprocessText = (text: string): string => {
   const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu
   const EMAIL_REGEX = /[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/
   const EMOTICON_REGEX = /[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)/
-  const KEEP_REGEX = new RegExp(
-    `(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${TRAILING_PUNCTUATION_REGEX.source})|([a-zA-Z0-9\\s!?$%'])|(.)`,
+  const TOKEN_REGEX = new RegExp(
+    `(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${TRAILING_PUNCTUATION_REGEX.source})`,
     'gu'
   );
 
-  let processed = tokenise(text).map(t => t.toLowerCase()).join(" ")
-  const result = processed.replaceAll(
-    KEEP_REGEX,
-    (match: string, _p1?: string, _p2?: string, _p3?: string, p4?: string): string => {
-      return p4 === undefined ? match : " ";
-    }
-  );
-  return result
+  const tokens = text.match(TOKEN_REGEX)
+  if (!tokens) {
+    return ""
+  }
+
+  return tokens.map(t => t.toLowerCase()).join(" ")
 }
 
 const updateTokenProbabilitiesUI = (content: string, inputField: Element, positive_probabilities: Float64Array<ArrayBufferLike>, negative_probabilities: Float64Array<ArrayBufferLike>): void => {
   const caretOffset = getCaretOffset(inputField)
   let t = preprocessText(content)
-
   const tokens = content.match(/\w+|[\p{P}\p{S}]+|\s+/gu) ?? []
   let processed_tokens = t.split(/\s+/) ?? []
   let output = ""
@@ -60,7 +57,7 @@ const updateTokenProbabilitiesUI = (content: string, inputField: Element, positi
       continue
     }
 
-    if (processed_tokens.includes(token)) {
+    if (processed_tokens.includes(token.toLowerCase())) {
       console.log(positive_probabilities[counter])
       console.log(negative_probabilities[counter])
 

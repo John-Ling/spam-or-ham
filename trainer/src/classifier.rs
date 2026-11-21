@@ -21,23 +21,11 @@ pub struct Classifier {
     negative_unseen_likelihood: f64,
 }
 
-const TRAILING_PUNCTUATION_REGEX_: &str = r"\w+|[[:punct:]]+";
-const TRAILING_PUNCTUATION_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(TRAILING_PUNCTUATION_REGEX_).unwrap());
 const EMAIL_REGEX: &str = r"[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*";
 const EMOTICON_REGEX: &str = r"[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)";
 
-static KEEP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    {
-        Regex::new(
-            format!(
-                r"({})|({})|({})|([a-zA-Z0-9\s!?$%'])|(.)",
-                EMAIL_REGEX, EMOTICON_REGEX, TRAILING_PUNCTUATION_REGEX_
-            )
-            .as_str(),
-        )
-    }
-    .unwrap()
+static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!(r"{EMAIL_REGEX}|{EMOTICON_REGEX}|\w+|[[:punct:]]+")).unwrap()
 });
 
 impl Classifier {
@@ -165,7 +153,7 @@ impl Classifier {
                     .cast(DataType::Float64)
                     .alias("negative_counts"),
             ])
-            .filter((col("positive_counts") + col("negative_counts")).gt_eq(lit(5.0)))
+            .filter((col("positive_counts") + col("negative_counts")).gt_eq(lit(2.0)))
             .collect()?;
 
         let unique_word_count = per_word_counts.column("tokens")?.len() as f64;
@@ -229,8 +217,6 @@ impl Classifier {
             let likelihood_positive = lp.unwrap_or(&self.positive_unseen_likelihood);
             let likelihood_negative = ln.unwrap_or(&self.negative_unseen_likelihood);
 
-            println!("{} {} ", likelihood_positive, likelihood_negative);
-
             positive_probability += likelihood_positive.ln();
             negative_probability += likelihood_negative.ln();
         }
@@ -256,24 +242,11 @@ impl Classifier {
     }
 
     fn preprocess_text(text: &str) -> String {
-        // Remove stop words
-        let processed = Self::tokenise(text)
-            .into_iter()
-            .map(|w| w.to_lowercase())
+        TOKEN_REGEX
+            .find_iter(text)
+            .map(|m| m.as_str().to_lowercase())
             .collect::<Vec<_>>()
-            .join(" ");
-
-        // Remove all other characters not in the KEEP_REGEX
-        // KEEP_REGEX also keeps emails and emoticons that otherwise would have been stripped
-        KEEP_REGEX
-            .replace_all(&processed, |caps: &regex::Captures| {
-                if caps.get(4).is_none() {
-                    caps[0].to_string()
-                } else {
-                    " ".to_string()
-                }
-            })
-            .into_owned()
+            .join(" ")
     }
 
     pub fn parse_csv(
@@ -294,21 +267,5 @@ impl Classifier {
         self.positive_label = positive_label.to_string();
         self.negative_label = negative_label.to_string();
         Ok(df)
-    }
-    // Split text into tokens including stripping trailing punctuation as their own token
-    // i.e hello! becomes "hello", "!"
-    fn tokenise(text: &str) -> Vec<String> {
-        let t: Vec<&str> = TRAILING_PUNCTUATION_REGEX
-            .find_iter(text)
-            .map(|s| s.as_str())
-            .collect::<Vec<&str>>();
-
-        let tokens = t.iter().map(|t| t.to_string()).collect::<Vec<String>>();
-        // let bigrams = t
-        //     .windows(2)
-        //     .map(|w| format!("{}_{}", w[0], w[1]))
-        //     .collect::<Vec<String>>();
-        return tokens;
-        // return [tokens].concat();
     }
 }

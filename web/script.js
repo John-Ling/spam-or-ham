@@ -23,12 +23,12 @@ const preprocessText = (text) => {
     const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu;
     const EMAIL_REGEX = /[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/;
     const EMOTICON_REGEX = /[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)/;
-    const KEEP_REGEX = new RegExp(`(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${TRAILING_PUNCTUATION_REGEX.source})|([a-zA-Z0-9\\s!?$%'])|(.)`, 'gu');
-    let processed = tokenise(text).map(t => t.toLowerCase()).join(" ");
-    const result = processed.replaceAll(KEEP_REGEX, (match, _p1, _p2, _p3, p4) => {
-        return p4 === undefined ? match : " ";
-    });
-    return result;
+    const TOKEN_REGEX = new RegExp(`(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${TRAILING_PUNCTUATION_REGEX.source})`, 'gu');
+    const tokens = text.match(TOKEN_REGEX);
+    if (!tokens) {
+        return "";
+    }
+    return tokens.map(t => t.toLowerCase()).join(" ");
 };
 const updateTokenProbabilitiesUI = (content, inputField, positive_probabilities, negative_probabilities) => {
     const caretOffset = getCaretOffset(inputField);
@@ -42,7 +42,7 @@ const updateTokenProbabilitiesUI = (content, inputField, positive_probabilities,
             output += token;
             continue;
         }
-        if (processed_tokens.includes(token)) {
+        if (processed_tokens.includes(token.toLowerCase())) {
             console.log(positive_probabilities[counter]);
             console.log(negative_probabilities[counter]);
             output += `<button class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter].toFixed(6))} / NEGATIVE: ${parseFloat(negative_probabilities[counter].toFixed(6))}"
