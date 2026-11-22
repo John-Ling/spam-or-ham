@@ -1,9 +1,11 @@
+const WORDS_NEWLINES_OR_SYMBOLS = /(?:\r?\n)+|\w+|[\p{General_Category=Punctuation}\p{General_Category=Symbol}]/gu
+const EMAIL_REGEX = /[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/
+const EMOTICON_REGEX = /[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)/
+
 export const preprocessText = (text: string): string => {
-  const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu
-  const EMAIL_REGEX = /[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/
-  const EMOTICON_REGEX = /[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)/
+  // const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu
   const TOKEN_REGEX = new RegExp(
-    `(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${TRAILING_PUNCTUATION_REGEX.source})`,
+    `(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${WORDS_NEWLINES_OR_SYMBOLS.source})`,
     'gu'
   );
 
@@ -24,7 +26,7 @@ export const updateTokenProbabilitiesUI = ({ content, inputField, positive_proba
 
 export const generateOutputHTML = (content: string, positive_probabilities: Float64Array<ArrayBufferLike>, negative_probabilities: Float64Array<ArrayBufferLike>): string => {
   let t = preprocessText(content)
-  const tokens = content.match(/\w+|[\p{General_Category=Punctuation}\p{General_Category=Symbol}]|\s+/gu) ?? []
+  const tokens = tokenise(content)
   let processed_tokens = t.split(/\s+/) ?? []
   let output = ""
   let counter = 0
@@ -35,10 +37,7 @@ export const generateOutputHTML = (content: string, positive_probabilities: Floa
     }
 
     if (processed_tokens.includes(token.toLowerCase())) {
-      console.log(positive_probabilities[counter])
-      console.log(negative_probabilities[counter])
-
-      output += `<button class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter]!.toFixed(6))} / NEGATIVE: ${parseFloat(negative_probabilities[counter]!.toFixed(6))}"
+      output += `<button data-id="${counter}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter]!.toFixed(6))} | NEGATIVE: ${parseFloat(negative_probabilities[counter]!.toFixed(6))}"
 >${token}</button>`
       counter += 1
       continue
@@ -49,7 +48,6 @@ export const generateOutputHTML = (content: string, positive_probabilities: Floa
 }
 
 export const tokenise = (text: string): string[] => {
-  const WORDS_NEWLINES_OR_SYMBOLS = /(?:\r?\n)+|\w+|[\p{General_Category=Punctuation}\p{General_Category=Symbol}]/gu
   return text.match(WORDS_NEWLINES_OR_SYMBOLS) ?? []
 }
 
