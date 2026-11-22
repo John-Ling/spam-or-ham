@@ -58,7 +58,7 @@ impl Classifier {
         Ok(())
     }
 
-    fn preprocess_text(text: &str) -> String {
+    fn tokenise(text: &str) -> String {
         TOKEN_REGEX
             .find_iter(text)
             .map(|m| m.as_str().to_lowercase())
@@ -67,7 +67,7 @@ impl Classifier {
     }
 
     pub fn predict(&self, text: &str) -> Result<(bool, Vec<(f64, f64)>), Box<dyn Error>> {
-        let preprocessed = Self::preprocess_text(text);
+        let preprocessed = Self::tokenise(text);
         let tokens: Vec<&str> = preprocessed.split_whitespace().collect();
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();

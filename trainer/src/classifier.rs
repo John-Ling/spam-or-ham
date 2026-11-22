@@ -204,7 +204,7 @@ impl Classifier {
     }
 
     pub fn predict(&self, text: &str) -> bool {
-        let tokens = Self::preprocess_text(text).split_whitespace().into_vec();
+        let tokens = Self::tokenise(text).split_whitespace().into_vec();
         let mut positive_probability = self.positive_probability.ln();
         let mut negative_probability = (1.0 - self.positive_probability).ln();
         for token in tokens {
@@ -234,7 +234,7 @@ impl Classifier {
         let processed_corpus = corpus.lazy().with_columns([col(content_column).map(
             move |c| {
                 let ca = c.str()?;
-                let out: StringChunked = ca.apply_values(|t| Self::preprocess_text(t).into());
+                let out: StringChunked = ca.apply_values(|t| Self::tokenise(t).into());
 
                 Ok(out.into_column())
             },
@@ -244,7 +244,7 @@ impl Classifier {
         Ok(processed_corpus.collect()?)
     }
 
-    fn preprocess_text(text: &str) -> String {
+    fn tokenise(text: &str) -> String {
         TOKEN_REGEX
             .find_iter(text)
             .map(|m| m.as_str().to_lowercase())

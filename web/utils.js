@@ -1,14 +1,14 @@
-const WORDS_NEWLINES_OR_SYMBOLS = /(?:\r?\n)+|\w+|[\p{General_Category=Punctuation}\p{General_Category=Symbol}]/gu;
+const WORDS_NEWLINES_OR_SYMBOLS = /(?:\r?\n)+|\w+|[\p{General_Category=Punctuation}\p{General_Category=Symbol}]|\s+/gu;
 const EMAIL_REGEX = /[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/;
 const EMOTICON_REGEX = /[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)/;
-export const preprocessText = (text) => {
+export const tokenise = (text) => {
     // const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu
     const TOKEN_REGEX = new RegExp(`(${EMAIL_REGEX.source})|(${EMOTICON_REGEX.source})|(${WORDS_NEWLINES_OR_SYMBOLS.source})`, 'gu');
     const tokens = text.match(TOKEN_REGEX);
     if (!tokens) {
-        return "";
+        return [];
     }
-    return tokens.map(t => t.toLowerCase()).join(" ");
+    return tokens.map(t => t.toLowerCase());
 };
 export const updateTokenProbabilitiesUI = ({ content, inputField, positive_probabilities, negative_probabilities }) => {
     const caretOffset = getCaretOffset(inputField);
@@ -17,9 +17,7 @@ export const updateTokenProbabilitiesUI = ({ content, inputField, positive_proba
     moveCaretToOffset(inputField, caretOffset);
 };
 export const generateOutputHTML = (content, positive_probabilities, negative_probabilities) => {
-    let t = preprocessText(content);
     const tokens = tokenise(content);
-    let processed_tokens = t.split(/\s+/) ?? [];
     let output = "";
     let counter = 0;
     for (const token of tokens) {
@@ -27,18 +25,10 @@ export const generateOutputHTML = (content, positive_probabilities, negative_pro
             output += token;
             continue;
         }
-        if (processed_tokens.includes(token.toLowerCase())) {
-            output += `<button data-id="${counter}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter].toFixed(6))} | NEGATIVE: ${parseFloat(negative_probabilities[counter].toFixed(6))}"
->${token}</button>`;
-            counter += 1;
-            continue;
-        }
-        output += `<button class="token highlight-red">${token}</button>`;
+        output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter].toFixed(6))} | NEGATIVE: ${parseFloat(negative_probabilities[counter].toFixed(6))}">${token}</button>`;
+        counter += 1;
     }
     return output;
-};
-export const tokenise = (text) => {
-    return text.match(WORDS_NEWLINES_OR_SYMBOLS) ?? [];
 };
 const getCaretOffset = (element) => {
     const selection = window.getSelection();
