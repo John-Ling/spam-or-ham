@@ -94,31 +94,17 @@
     color: var(--foreground);
 }
 
-.has-tooltip {
-    position: relative;
-}
-
-.has-tooltip::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    opacity: 0;
-    overflow-wrap: normal;
-    width: 19rem;
-    color: var(--background);
-    /* background: rgb(from var(--foreground) r g b / 0.2); */
+#tooltip {
+    position: fixed;
+    display: none;
+    pointer-events: none;
+    z-index: 1000;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font: 0.75rem "Inter";
+    white-space: nowrap;
     background: var(--foreground);
-    border: solid 1px var(--foreground);
-    margin-bottom: 5px;
-    transition: opacity 0.1s;
-    z-index: 10;
-}
-
-.has-tooltip:hover::after,
-.has-tooltip:focus-visible::after {
-    opacity: 1;
+    color: var(--background);
 }
 
 .token:active {
@@ -156,12 +142,11 @@
     font-family: "Inter";
     resize: none;
     white-space: pre-wrap;
-    /* width: 40%; */
     width: clamp(14rem, 80vw, 30rem);
-    overflow-wrap: anywhere;
-    /* scrollbar-width: none; */
-    /* overflow-x: auto; */
     height: 24rem;
+    overflow-wrap: anywhere;
+    overflow-x: scroll;
+    scrollbar-width: none;
     padding: 0.25rem;
     z-index: 0;
 }
