@@ -25,8 +25,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         let left = tokenBoundingRectangle.left + tokenBoundingRectangle.width / 2 - width / 2;
         left = Math.max(4, Math.min(left, window.innerWidth - width - 4));
         let top = tokenBoundingRectangle.top - height - 6;
-        if (top < 4)
+        if (top < 4) {
             top = tokenBoundingRectangle.bottom + 6;
+        }
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
     });

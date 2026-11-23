@@ -17,14 +17,22 @@
     </div>
 
     <div id="app-body">
-      <div>
-        <div id="input-field" contenteditable="plaintext-only" spellcheck="false"></div>
-        <p class="prose">Trained on English texts - other languages won't yield accurate predictions.</p>
+      <div class="probability-container ">
+        <p class="prose">Positive</p>
+        <p class="prose">Negative</p>
       </div>
-      <p class="prose">Naive Bayes classifiers are a form of probabilistic classifiers, that is they use simple
-        probability perform classification tasks incredibly quickly. The textbook use of a multinomial NB classifier is
-        determining whether an incoming message is <span>spam</span> or not spam (aka <span>ham</span>).
-        This project is the only thing keeping me sane during my exams.</p>
+      <div class="container">
+        <div class="container-vertical">
+          <div id="input-field" contenteditable="plaintext-only" spellcheck="false"></div>
+          <p class="prose">Trained on English texts - other languages won't yield accurate predictions.</p>
+        </div>
+        <p class="prose description">Naive Bayes classifiers are a form of probabilistic classifiers, that is they use
+          simple
+          probability perform classification tasks incredibly quickly. The textbook use of a multinomial NB classifier
+          is
+          determining whether an incoming message is <span>spam</span> or not spam (aka <span>ham</span>).
+          This project is the only thing keeping me sane during my exams.</p>
+      </div>
     </div>
   </div>
   <script type="module" src="script.js"></script>
