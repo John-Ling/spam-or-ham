@@ -1,5 +1,5 @@
 import init, { load_classifier, predict } from "./public/wasm.js"
-import { updateTokenProbabilitiesUI } from "./utils.js";
+import { generateOutputHTML, getCaretOffset, moveCaretToOffset, updateProbabilityCounterUI } from "./utils.js";
 
 let loaded = false
 
@@ -68,13 +68,23 @@ document.getElementById("input-field")?.addEventListener("input", (e) => {
     spamHeader.classList = ""
     hamHeader.classList = ""
     inputField.innerHTML = ""
+    updateProbabilityCounterUI(0.0, 0.0)
     return
   }
 
-  let { outcome: isSpam, positive_probabilities, negative_probabilities } = predict(content)
+  let {
+    outcome: isSpam,
+    positive_likelihoods: positiveLikelihoods,
+    negative_likelihoods: negativeLikelihoods,
+    positive_probability: positiveProbability,
+    negative_probability: negativeProbability
+  } = predict(content)
   spamHeader.classList = isSpam ? "lift" : "sink"
   hamHeader.classList = isSpam ? "sink" : "lift"
-
-  updateTokenProbabilitiesUI({ content, inputField, positive_probabilities, negative_probabilities })
+  const caretOffset = getCaretOffset(inputField)
+  const output = generateOutputHTML(content, positiveLikelihoods, negativeLikelihoods)
+  inputField.innerHTML = output;
+  moveCaretToOffset(inputField, caretOffset)
+  updateProbabilityCounterUI(positiveProbability, negativeProbability)
 })
 

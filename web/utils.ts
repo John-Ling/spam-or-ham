@@ -2,6 +2,8 @@ const WORDS_NEWLINES_OR_SYMBOLS = /(?:\r?\n)+|\w+|[\p{General_Category=Punctuati
 const EMAIL_REGEX = /[a-zA-Z.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/
 const EMOTICON_REGEX = /[:;=8]-?[)(DPOpo|\\/*]|\([a-z]{2,10}\)/
 
+type FloatArray = Float64Array<ArrayBufferLike>
+
 export const tokenise = (text: string): string[] => {
   // const TRAILING_PUNCTUATION_REGEX = /(?:\r?\n)+|\w+|\p{P}+/gu
   const TOKEN_REGEX = new RegExp(
@@ -17,14 +19,19 @@ export const tokenise = (text: string): string[] => {
   return tokens.map(t => t.toLowerCase())
 }
 
-export const updateTokenProbabilitiesUI = ({ content, inputField, positive_probabilities, negative_probabilities }: { content: string, inputField: Element, positive_probabilities: Float64Array<ArrayBufferLike>, negative_probabilities: Float64Array<ArrayBufferLike> }): void => {
-  const caretOffset = getCaretOffset(inputField)
-  const output = generateOutputHTML(content, positive_probabilities, negative_probabilities)
-  inputField.innerHTML = output;
-  moveCaretToOffset(inputField, caretOffset)
+export const updateProbabilityCounterUI = (positiveProbability: number, negativeProbability: number) => {
+  const positiveCounter = document.getElementById("positive-value")
+  const negativeCounter = document.getElementById("negative-value")
+  if (!positiveCounter || !negativeCounter) {
+    console.error("Cannot update counters")
+    return
+  }
+
+  positiveCounter.innerText = `${parseFloat((positiveProbability * 100).toFixed(6))}%`
+  negativeCounter.innerText = `${parseFloat((negativeProbability * 100).toFixed(6))}%`
 }
 
-export const generateOutputHTML = (content: string, positive_probabilities: Float64Array<ArrayBufferLike>, negative_probabilities: Float64Array<ArrayBufferLike>): string => {
+export const generateOutputHTML = (content: string, positiveLikelihoods: FloatArray, negativeLikelihoods: FloatArray): string => {
   const tokens = tokenise(content)
   let output = ""
   let counter = 0
@@ -34,13 +41,13 @@ export const generateOutputHTML = (content: string, positive_probabilities: Floa
       continue
     }
 
-    output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter]!.toFixed(6))} | NEGATIVE: ${parseFloat(negative_probabilities[counter]!.toFixed(6))}">${token}</button>`
+    output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positiveLikelihoods[counter]!.toFixed(6))} | NEGATIVE: ${parseFloat(negativeLikelihoods[counter]!.toFixed(6))}">${token}</button>`
     counter += 1
   }
   return output
 }
 
-const getCaretOffset = (element: Element): number => {
+export const getCaretOffset = (element: Element): number => {
   const selection = window.getSelection()
   if (!selection || !selection.rangeCount) {
     return 0

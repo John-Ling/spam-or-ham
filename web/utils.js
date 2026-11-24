@@ -10,13 +10,17 @@ export const tokenise = (text) => {
     }
     return tokens.map(t => t.toLowerCase());
 };
-export const updateTokenProbabilitiesUI = ({ content, inputField, positive_probabilities, negative_probabilities }) => {
-    const caretOffset = getCaretOffset(inputField);
-    const output = generateOutputHTML(content, positive_probabilities, negative_probabilities);
-    inputField.innerHTML = output;
-    moveCaretToOffset(inputField, caretOffset);
+export const updateProbabilityCounterUI = (positiveProbability, negativeProbability) => {
+    const positiveCounter = document.getElementById("positive-value");
+    const negativeCounter = document.getElementById("negative-value");
+    if (!positiveCounter || !negativeCounter) {
+        console.error("Cannot update counters");
+        return;
+    }
+    positiveCounter.innerText = `${parseFloat((positiveProbability * 100).toFixed(6))}%`;
+    negativeCounter.innerText = `${parseFloat((negativeProbability * 100).toFixed(6))}%`;
 };
-export const generateOutputHTML = (content, positive_probabilities, negative_probabilities) => {
+export const generateOutputHTML = (content, positiveLikelihoods, negativeLikelihoods) => {
     const tokens = tokenise(content);
     let output = "";
     let counter = 0;
@@ -25,12 +29,12 @@ export const generateOutputHTML = (content, positive_probabilities, negative_pro
             output += token;
             continue;
         }
-        output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positive_probabilities[counter].toFixed(6))} | NEGATIVE: ${parseFloat(negative_probabilities[counter].toFixed(6))}">${token}</button>`;
+        output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positiveLikelihoods[counter].toFixed(6))} | NEGATIVE: ${parseFloat(negativeLikelihoods[counter].toFixed(6))}">${token}</button>`;
         counter += 1;
     }
     return output;
 };
-const getCaretOffset = (element) => {
+export const getCaretOffset = (element) => {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) {
         return 0;

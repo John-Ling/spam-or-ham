@@ -66,11 +66,11 @@ impl Classifier {
             .join(" ")
     }
 
-    pub fn predict(&self, text: &str) -> Result<(bool, Vec<(f64, f64)>), Box<dyn Error>> {
+    pub fn predict(&self, text: &str) -> Result<(bool, f64, f64, Vec<(f64, f64)>), Box<dyn Error>> {
         let preprocessed = Self::tokenise(text);
         let tokens: Vec<&str> = preprocessed.split_whitespace().collect();
-        let mut positive_probability = self.positive_probability.ln();
-        let mut negative_probability = (1.0 - self.positive_probability).ln();
+        let mut positive_log_sum = self.positive_probability.ln();
+        let mut negative_log_sum = (1.0 - self.positive_probability).ln();
 
         let mut probabilities = vec![(0.0, 0.0); tokens.len()];
         for (i, t) in tokens.iter().enumerate() {
@@ -89,12 +89,27 @@ impl Classifier {
             probabilities[i] = (likelihood_positive.clone(), likelihood_negative.clone());
 
             // Multiplying small probabilities can lead to underflow hence convert to log scale to and sum instead
-            positive_probability += likelihood_positive.ln();
-            negative_probability += likelihood_negative.ln();
+            positive_log_sum += likelihood_positive.ln();
+            negative_log_sum += likelihood_negative.ln();
         }
 
+        // Find normalised per-class probabilities using Softmax
+        let max = positive_log_sum.max(negative_log_sum);
+        let exponent_positive = (positive_log_sum - max).exp();
+        let exponent_negative = (negative_log_sum - max).exp();
+        let total = exponent_negative + exponent_positive;
+
+        let positive_probability = exponent_positive / total;
+        let negative_probability = exponent_negative / total;
+
         // Normalisation via logistic sigmoid
-        let p = 1.0 / (1.0 + (negative_probability - positive_probability).exp());
-        Ok((p > 0.995, probabilities))
+        let p = 1.0 / (1.0 + (negative_log_sum - positive_log_sum).exp());
+
+        Ok((
+            p > 0.995,
+            positive_probability,
+            negative_probability,
+            probabilities,
+        ))
     }
 }
