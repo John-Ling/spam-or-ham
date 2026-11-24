@@ -1,6 +1,6 @@
 @font-face {
     font-family: "Lalezar";
-    src: url("public/Lalezar-Regular.ttf") format("truetype");
+    src: url("/Lalezar-Regular.ttf") format("truetype");
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
     font-family: "Inter";
-    src: url("public/Inter_18pt-Bold.ttf") format("truetype");
+    src: url("/Inter_18pt-Bold.ttf") format("truetype");
     font-weight: bold;
     font-style: normal;
     font-display: swap;
@@ -25,6 +25,7 @@
 
 .prose {
     font-family: "Inter";
+    margin: 0;
 }
 
 #app {
@@ -66,7 +67,7 @@
     align-items: center;
     gap: 1rem;
     margin-top: clamp(2rem, 1rem + 5vh, 4rem);
-    height: clamp(1rem, 24vh, 20rem);
+    height: clamp(1rem, 19vh, 14.5rem);
 }
 
 #ham-header {
@@ -81,6 +82,20 @@
     -webkit-user-select: none;
     user-select: none;
     pointer-events: none;
+}
+
+button {
+    background-color: var(--card);
+    border: none;
+    color: var(--foreground);
+    font-family: "Inter";
+    padding: 0.25rem;
+}
+
+button:hover {
+    background-color: color-mix(in srgb, var(--card), black 10%);
+    color: color-mix(in srgb, var(--foreground), black 10%);
+    cursor: pointer;
 }
 
 .description {
@@ -101,15 +116,27 @@
     gap: 0.5rem;
 }
 
-.probability-container {
+#probability-container {
     display: flex;
     flex-direction: column;
     width: 90vw;
 }
 
+
 .probability-container p {
     margin: 0;
     padding: 0;
+}
+
+#sample-button-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    width: inherit;
+}
+
+#clear-button {
+    width: 100%;
 }
 
 .token {
@@ -134,7 +161,13 @@
 .token:active {
     transform: none !important;
     transition: none !important;
+    border: none;
+    outline: none;
     animation: none !important;
+}
+
+.token:focus {
+    outline: none;
 }
 
 
@@ -151,11 +184,11 @@
 
 
 .lift {
-    translate: 0 -70px;
+    translate: 0 -50px;
 }
 
 .sink {
-    translate: 0 70px;
+    translate: 0 50px;
 }
 
 
@@ -191,12 +224,24 @@
         align-items: center;
     }
 
+    #sample-button-container {
+        width: 90vw;
+    }
+
+    button {
+        padding: 1rem;
+    }
+
+    .token {
+        padding: 0.25rem;
+    }
+
     .container {
         flex-direction: column;
     }
 
-    .probability-container {
-        align-items: first baseline;
+    #probability-container {
+        position: absolute;
     }
 
     .container-vertical {

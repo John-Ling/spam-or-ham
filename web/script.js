@@ -1,16 +1,35 @@
 import init, { load_classifier, predict } from "./public/wasm.js";
+import { SAMPLE_TEXTS } from "./samples.js";
 import { generateOutputHTML, getCaretOffset, moveCaretToOffset, updateProbabilityCounterUI } from "./utils.js";
 let loaded = false;
 let inputField = null;
 let tooltip = null;
 document.addEventListener("DOMContentLoaded", async () => {
-    await init();
-    let res = await fetch("/model.json");
-    loaded = load_classifier(await res.text());
     inputField = document.getElementById("input-field");
     tooltip = document.createElement("div");
     tooltip.id = "tooltip";
     document.body.append(tooltip);
+    let spamHeader = document.getElementById("spam-header");
+    let hamHeader = document.getElementById("ham-header");
+    document.getElementById("input-field")?.addEventListener("input", (e) => {
+        let inputField = e.target;
+        let content = inputField.innerText;
+        if (content.trim() === "") {
+            spamHeader.classList = "";
+            hamHeader.classList = "";
+            inputField.innerHTML = "";
+            updateProbabilityCounterUI(0.0, 0.0);
+            return;
+        }
+        let { outcome: isSpam, positive_likelihoods: positiveLikelihoods, negative_likelihoods: negativeLikelihoods, positive_probability: positiveProbability, negative_probability: negativeProbability } = predict(content);
+        spamHeader.classList = isSpam ? "lift" : "sink";
+        hamHeader.classList = isSpam ? "sink" : "lift";
+        const caretOffset = getCaretOffset(inputField);
+        const output = generateOutputHTML(content, positiveLikelihoods, negativeLikelihoods);
+        inputField.innerHTML = output;
+        moveCaretToOffset(inputField, caretOffset);
+        updateProbabilityCounterUI(positiveProbability, negativeProbability);
+    });
     inputField?.addEventListener("mouseover", (e) => {
         const selectedToken = e.target.closest(".has-tooltip");
         if (!selectedToken || !tooltip) {
@@ -39,31 +58,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     inputField?.addEventListener("scroll", hideTooltip);
     window.addEventListener("scroll", hideTooltip, true);
+    const sampleButtonContainer = document.getElementById("sample-button-container");
+    if (sampleButtonContainer) {
+        Object.keys(SAMPLE_TEXTS).forEach((key, i) => {
+            const button = document.createElement("button");
+            button.textContent = `Sample ${i + 1}`;
+            button.dataset.key = key;
+            button.addEventListener("click", e => {
+                e.preventDefault();
+                loadSampleIntoInput(key);
+            });
+            sampleButtonContainer.append(button);
+        });
+    }
+    document.getElementById("clear-button")?.addEventListener("click", () => {
+        if (!inputField) {
+            return;
+        }
+        inputField.innerText = "";
+        inputField.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await init();
+    let res = await fetch("/model.json");
+    loaded = load_classifier(await res.text());
 });
+const loadSampleIntoInput = (key) => {
+    if (!inputField) {
+        return;
+    }
+    inputField.innerText = SAMPLE_TEXTS[key] ?? "";
+    inputField.dispatchEvent(new Event("input", { bubbles: true }));
+};
 const hideTooltip = () => {
     if (tooltip) {
         tooltip.style.display = 'none';
     }
 };
-let spamHeader = document.getElementById("spam-header");
-let hamHeader = document.getElementById("ham-header");
-document.getElementById("input-field")?.addEventListener("input", (e) => {
-    let inputField = e.target;
-    let content = inputField.innerText;
-    if (content.trim() === "") {
-        spamHeader.classList = "";
-        hamHeader.classList = "";
-        inputField.innerHTML = "";
-        updateProbabilityCounterUI(0.0, 0.0);
-        return;
-    }
-    let { outcome: isSpam, positive_likelihoods: positiveLikelihoods, negative_likelihoods: negativeLikelihoods, positive_probability: positiveProbability, negative_probability: negativeProbability } = predict(content);
-    spamHeader.classList = isSpam ? "lift" : "sink";
-    hamHeader.classList = isSpam ? "sink" : "lift";
-    const caretOffset = getCaretOffset(inputField);
-    const output = generateOutputHTML(content, positiveLikelihoods, negativeLikelihoods);
-    inputField.innerHTML = output;
-    moveCaretToOffset(inputField, caretOffset);
-    updateProbabilityCounterUI(positiveProbability, negativeProbability);
-});
 //# sourceMappingURL=script.js.map
