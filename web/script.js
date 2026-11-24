@@ -4,6 +4,9 @@ import { generateOutputHTML, getCaretOffset, moveCaretToOffset, updateProbabilit
 let loaded = false;
 let inputField = null;
 let tooltip = null;
+let previousOutcome = null;
+const clear = new Audio("/clear.wav");
+const click = new Audio("/click.wav");
 document.addEventListener("DOMContentLoaded", async () => {
     inputField = document.getElementById("input-field");
     tooltip = document.createElement("div");
@@ -18,10 +21,18 @@ document.addEventListener("DOMContentLoaded", async () => {
             spamHeader.classList = "";
             hamHeader.classList = "";
             inputField.innerHTML = "";
+            previousOutcome = null;
+            clear.currentTime = 0;
+            clear.play();
             updateProbabilityCounterUI(0.0, 0.0);
             return;
         }
         let { outcome: isSpam, positive_likelihoods: positiveLikelihoods, negative_likelihoods: negativeLikelihoods, positive_probability: positiveProbability, negative_probability: negativeProbability } = predict(content);
+        if (previousOutcome === null || isSpam !== previousOutcome) {
+            click.currentTime = 0;
+            click.play();
+        }
+        previousOutcome = isSpam;
         spamHeader.classList = isSpam ? "lift" : "sink";
         hamHeader.classList = isSpam ? "sink" : "lift";
         const caretOffset = getCaretOffset(inputField);

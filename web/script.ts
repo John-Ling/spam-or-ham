@@ -5,10 +5,12 @@ import { generateOutputHTML, getCaretOffset, moveCaretToOffset, updateProbabilit
 let loaded = false
 let inputField: HTMLDivElement | null = null
 let tooltip: HTMLDivElement | null = null
+let previousOutcome: boolean | null = null
+
+const clear = new Audio("/clear.wav")
+const click = new Audio("/click.wav")
 
 document.addEventListener("DOMContentLoaded", async () => {
-
-
   inputField = document.getElementById("input-field") as HTMLDivElement
   tooltip = document.createElement("div")
   tooltip.id = "tooltip"
@@ -25,6 +27,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       spamHeader.classList = ""
       hamHeader.classList = ""
       inputField.innerHTML = ""
+      previousOutcome = null
+      clear.currentTime = 0
+      clear.play()
+
       updateProbabilityCounterUI(0.0, 0.0)
       return
     }
@@ -36,8 +42,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       positive_probability: positiveProbability,
       negative_probability: negativeProbability
     } = predict(content)
+
+    if (previousOutcome === null || isSpam !== previousOutcome) {
+      click.currentTime = 0
+      click.play()
+    }
+
+    previousOutcome = isSpam
     spamHeader.classList = isSpam ? "lift" : "sink"
     hamHeader.classList = isSpam ? "sink" : "lift"
+
     const caretOffset = getCaretOffset(inputField)
     const output = generateOutputHTML(content, positiveLikelihoods, negativeLikelihoods)
     inputField.innerHTML = output;
@@ -83,6 +97,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (sampleButtonContainer) {
     Object.keys(SAMPLE_TEXTS).forEach((key, i) => {
       const button = document.createElement("button");
+
       button.textContent = `Sample ${i + 1}`
       button.dataset.key = key
       button.addEventListener("click", e => {
