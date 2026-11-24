@@ -5,7 +5,7 @@ import { generateOutputHTML, getCaretOffset, moveCaretToOffset, updateProbabilit
 let loaded = false
 let inputField: HTMLDivElement | null = null
 let tooltip: HTMLDivElement | null = null
-let previousOutcome: boolean | null = null
+let clearButton: HTMLButtonElement | null = null
 
 const clear = new Audio("/clear.wav")
 const click = new Audio("/click.wav")
@@ -27,7 +27,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       spamHeader.classList = ""
       hamHeader.classList = ""
       inputField.innerHTML = ""
-      previousOutcome = null
       clear.currentTime = 0
       clear.play()
 
@@ -43,12 +42,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       negative_probability: negativeProbability
     } = predict(content)
 
-    if (previousOutcome === null || isSpam !== previousOutcome) {
-      click.currentTime = 0
-      click.play()
-    }
-
-    previousOutcome = isSpam
     spamHeader.classList = isSpam ? "lift" : "sink"
     hamHeader.classList = isSpam ? "sink" : "lift"
 
@@ -97,9 +90,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (sampleButtonContainer) {
     Object.keys(SAMPLE_TEXTS).forEach((key, i) => {
       const button = document.createElement("button");
-
+      button.classList = "sample-button"
       button.textContent = `Sample ${i + 1}`
       button.dataset.key = key
+      button.disabled = true
       button.addEventListener("click", e => {
         e.preventDefault()
         loadSampleIntoInput(key)
@@ -108,7 +102,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     })
   }
 
-  document.getElementById("clear-button")?.addEventListener("click", () => {
+  clearButton = document.getElementById("clear-button") as HTMLButtonElement
+  clearButton?.addEventListener("click", () => {
     if (!inputField) {
       return
     }
@@ -116,17 +111,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     inputField.dispatchEvent(new Event("input", { bubbles: true }))
   })
 
-
   await init();
   let res = await fetch("/model.json");
   loaded = load_classifier(await res.text())
+
+  if (loaded) {
+    inputField.contentEditable = "plaintext-only"
+    clearButton.disabled = false
+    document.querySelectorAll(".sample-button").forEach(e => {
+      const button = e as HTMLButtonElement
+      button.disabled = false
+    })
+
+  }
 })
 
 const loadSampleIntoInput = (key: keyof typeof SAMPLE_TEXTS): void => {
   if (!inputField) {
     return
   }
-
+  click.currentTime = 0
+  click.play()
   inputField.innerText = SAMPLE_TEXTS[key] ?? ""
   inputField.dispatchEvent(new Event("input", { bubbles: true }))
 }

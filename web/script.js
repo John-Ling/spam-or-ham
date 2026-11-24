@@ -4,7 +4,7 @@ import { generateOutputHTML, getCaretOffset, moveCaretToOffset, updateProbabilit
 let loaded = false;
 let inputField = null;
 let tooltip = null;
-let previousOutcome = null;
+let clearButton = null;
 const clear = new Audio("/clear.wav");
 const click = new Audio("/click.wav");
 document.addEventListener("DOMContentLoaded", async () => {
@@ -21,18 +21,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             spamHeader.classList = "";
             hamHeader.classList = "";
             inputField.innerHTML = "";
-            previousOutcome = null;
             clear.currentTime = 0;
             clear.play();
             updateProbabilityCounterUI(0.0, 0.0);
             return;
         }
         let { outcome: isSpam, positive_likelihoods: positiveLikelihoods, negative_likelihoods: negativeLikelihoods, positive_probability: positiveProbability, negative_probability: negativeProbability } = predict(content);
-        if (previousOutcome === null || isSpam !== previousOutcome) {
-            click.currentTime = 0;
-            click.play();
-        }
-        previousOutcome = isSpam;
         spamHeader.classList = isSpam ? "lift" : "sink";
         hamHeader.classList = isSpam ? "sink" : "lift";
         const caretOffset = getCaretOffset(inputField);
@@ -73,8 +67,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (sampleButtonContainer) {
         Object.keys(SAMPLE_TEXTS).forEach((key, i) => {
             const button = document.createElement("button");
+            button.classList = "sample-button";
             button.textContent = `Sample ${i + 1}`;
             button.dataset.key = key;
+            button.disabled = true;
             button.addEventListener("click", e => {
                 e.preventDefault();
                 loadSampleIntoInput(key);
@@ -82,7 +78,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             sampleButtonContainer.append(button);
         });
     }
-    document.getElementById("clear-button")?.addEventListener("click", () => {
+    clearButton = document.getElementById("clear-button");
+    clearButton?.addEventListener("click", () => {
         if (!inputField) {
             return;
         }
@@ -92,11 +89,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     await init();
     let res = await fetch("/model.json");
     loaded = load_classifier(await res.text());
+    if (loaded) {
+        inputField.contentEditable = "plaintext-only";
+        clearButton.disabled = false;
+        document.querySelectorAll(".sample-button").forEach(e => {
+            const button = e;
+            button.disabled = false;
+        });
+    }
 });
 const loadSampleIntoInput = (key) => {
     if (!inputField) {
         return;
     }
+    click.currentTime = 0;
+    click.play();
     inputField.innerText = SAMPLE_TEXTS[key] ?? "";
     inputField.dispatchEvent(new Event("input", { bubbles: true }));
 };
