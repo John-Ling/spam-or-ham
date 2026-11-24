@@ -18,20 +18,30 @@
 
     <div id="app-body">
       <div class="probability-container ">
-        <p class="prose">Positive: <span id="positive-value">0%</span></p>
-        <p class="prose">Negative: <span id="negative-value">0%</span></p>
+        <p class="prose">Chance of Spam: <span id="positive-value">0%</span></p>
+        <p class="prose">Chance of Ham: <span id="negative-value">0%</span></p>
       </div>
       <div class="container">
         <div class="container-vertical">
           <div id="input-field" contenteditable="plaintext-only" spellcheck="false"></div>
-          <p class="prose">Trained on English texts - other languages won't yield accurate predictions.</p>
+          <div>
+            <p class="prose">spam = P(spam) ≥ 0.995</p>
+          </div>
         </div>
-        <p class="prose description">Naive Bayes classifiers are a form of probabilistic classifiers, that is they use
-          simple
-          probability perform classification tasks incredibly quickly. The textbook use of a multinomial NB classifier
-          is
-          determining whether an incoming message is <span>spam</span> or not spam (aka <span>ham</span>).
-          This project is the only thing keeping me sane during my exams.</p>
+        <div class="container-vertical">
+          <p class="prose description">
+            Naive Bayes methods methods are supervised-learning algorithms that trade accuracy for speed.
+          </p>
+          <p class="prose description">
+            Simply put, these classifiers use the product of the probability of words appearing in each possible class
+            to
+            determine which one an input text belongs to.
+          </p>
+          <p class="prose description">
+            The textbook use for such a classifier is determining whether amessage
+            is spam or not spam (aka ham).
+          </p>
+        </div>
       </div>
     </div>
   </div>
