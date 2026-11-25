@@ -3139,7 +3139,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "stop-words",
  "wasm-bindgen",
  "web-sys",
 ]
