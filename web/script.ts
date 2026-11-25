@@ -112,7 +112,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   })
 
   await init();
-  let res = await fetch("/model.json");
+  const res = await fetch("/model.json.br");
   loaded = load_classifier(await res.text())
 
   if (loaded) {

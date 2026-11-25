@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         inputField.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await init();
-    let res = await fetch("/model.json");
+    const res = await fetch("/model.json.br");
     loaded = load_classifier(await res.text());
     if (loaded) {
         inputField.contentEditable = "plaintext-only";
