@@ -1,0 +1,42 @@
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+defaults:
+  run:
+    working-directory: ./web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: clone repository
+        uses: actions/checkout@v4
+      - name: Setup pnpm and Node.js
+        uses: pnpm/setup@v3
+        with:
+          package-json-file: web/package.json
+          runtime: node@22
+          cache: true 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: build app 
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run test
+          pnpm run build
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::635656074158:role/ap-southeast-5-spam-or-ham-role 
+          aws-region: ap-southeast-5
+      - run: aws s3 sync dist/ s3://spam-or-ham-635656074158-ap-southeast-5-an --delete
+
+
