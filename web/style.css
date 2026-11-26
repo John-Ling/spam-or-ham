@@ -163,6 +163,11 @@ button:hover {
     outline: none;
 }
 
+.token:hover {
+	color: var(--foreground) !important;
+	background: rgb(from var(--foreground) r g b / 0.3) !important;
+}
+
 
 .highlight-yellow {
     background: rgb(from var(--foreground) r g b / 0.3);
