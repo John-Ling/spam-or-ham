@@ -29,7 +29,9 @@ export const generateOutputHTML = (content, positiveLikelihoods, negativeLikelih
             output += token;
             continue;
         }
-        output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positiveLikelihoods[counter].toFixed(6))} | NEGATIVE: ${parseFloat(negativeLikelihoods[counter].toFixed(6))}">${token}</button>`;
+        let positiveLikelihood = positiveLikelihoods[counter] ?? 0;
+        let negativeLikelihood = negativeLikelihoods[counter] ?? 0;
+        output += `<button data-id="${counter + 1}"  class="token has-tooltip highlight-yellow" data-tip="POSITIVE: ${parseFloat(positiveLikelihood.toFixed(6))} | NEGATIVE: ${parseFloat(negativeLikelihood.toFixed(6))}">${token}</button>`;
         counter += 1;
     }
     return output;

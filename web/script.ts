@@ -6,6 +6,7 @@ let loaded = false
 let inputField: HTMLDivElement | null = null
 let tooltip: HTMLDivElement | null = null
 let clearButton: HTMLButtonElement | null = null
+const hasNonAscii = (t: string) => /[^\x00-\x7F]/.test(t)
 
 const clear = new Audio("/clear.wav")
 const click = new Audio("/click.wav")
@@ -19,9 +20,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   let spamHeader = document.getElementById("spam-header")!;
   let hamHeader = document.getElementById("ham-header")!;
 
-  document.getElementById("input-field")?.addEventListener("input", (e) => {
+  // Block non-ascii text
+  inputField.addEventListener("beforeinput", e => {
+    const text = e.data ?? e.dataTransfer?.getData("text/plain") ?? ""
+    if (hasNonAscii(text)) {
+      e.preventDefault()
+      return;
+    }
+  })
+
+  // Strip characters inserted using composition
+  inputField.addEventListener("compositionend", () => {
+    if (!inputField) {
+      return
+    }
+
+    if (!hasNonAscii(inputField?.innerText ?? "")) {
+      return
+    }
+
+    inputField.textContent = inputField.innerText.replace(/[^\x00-\x7F]/g, "")
+    inputField.dispatchEvent(new Event("input", { bubbles: true }))
+  })
+
+  inputField.addEventListener("input", (e) => {
     let inputField = e.target as HTMLDivElement
     let content = inputField.innerText
+    console.log(content)
 
     if (content.trim() === "") {
       spamHeader.classList = ""
